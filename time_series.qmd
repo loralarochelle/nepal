@@ -7,6 +7,28 @@ editor: visual
 ```{r loading files}
 nepal <- read.csv("nepal.csv")
 View(nepal)
+nepal_gps <- read.csv("nepal_gps.csv")
+View(nepal_gps)
+library(tidyverse)
+
+nepal_gps_subset <- nepal_gps %>%
+  select(Year, In_silico_serotype, Clinical_manifestation)
+
+nepal_plot_data <- nepal %>%
+  select(Serotype, X2014n, X2015n, X2017n, X2018n, X2019n, X2021n) %>%
+  pivot_longer(
+    cols = starts_with("X"),
+    names_to = "Year",
+    values_to = "Count"
+  ) %>%
+  mutate(Year = gsub("X|n", "", Year)) %>%  # remove 'X' and 'n' from year strings
+  pivot_wider(
+    names_from = Serotype,
+    values_from = Count
+  )
+
+
+View(nepal_plot_data)
 ```
 
 You can add options to executable code like this
