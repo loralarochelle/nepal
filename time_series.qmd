@@ -25,10 +25,23 @@ nepal_plot_data <- nepal %>%
   pivot_wider(
     names_from = Serotype,
     values_from = Count
-  )
-
+  ) %>%
+  select(Year, (last_col() - 11):last_col()-1)
 
 View(nepal_plot_data)
+
+nepal_long <- nepal_plot_data %>%
+  pivot_longer(
+    cols = -Year,
+    names_to = "Serotype",
+    values_to = "Count"
+  )
+
+# Plot
+ggplot(data = nepal_long, aes(x = as.numeric(Year), y = Count, color = Serotype)) +
+  geom_line() +
+  theme_bw() +
+  labs(x = "Year", y = "Count", title = "Serotype Trends Over Time")
 ```
 
 You can add options to executable code like this
