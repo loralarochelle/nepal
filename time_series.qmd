@@ -15,7 +15,7 @@ pcv10serotypes <- c('1', '4', '5', '6B', '7F', '9V', '14', '18C', '19F', '23F')
 
 Introductory work:
 
-```{r plotting trends in serotypes}
+```{r plotting trends of serotypes}
 # getting data ready for plotting
 nepal_plot_data <- nepal %>%
   # select serotype + year columns
@@ -33,9 +33,30 @@ nepal_plot_data <- nepal %>%
 ggplot(data = nepal_plot_data, aes(x = as.numeric(Year), y = Count, color = Serotype)) +
   geom_line() +
   theme_bw() +
-  labs(x = "Year", y = "Count", title = "Serotype Trends Over Time")
+  labs(x = "Year", y = "Count", title = "Pneumococcal Disease Counts by Serotype Over Time")
 ```
 
-```{r }
+```{r plotting trends of PCV serotypes}
+# getting data ready for plotting
+nepal_plot_data_PCV10 <- nepal %>%
+  # select serotype + year columns
+  select(Serotype, X2014n, X2015n, X2017n, X2018n, X2019n, X2021n) %>%
+  # format data frame
+  pivot_longer(cols = -Serotype,
+               names_to = "Year",
+               values_to = "Count") %>%
+  # remove X and n from the year counts
+  mutate(Year = gsub("X|n", "", Year)) %>%
+  # filter out pcv10serotypes & the total rows
+  filter((Serotype %in% pcv10serotypes) & (!Serotype=="Total"))
+
+# plot serotype trends over time
+ggplot(data = nepal_plot_data_PCV10, aes(x = as.numeric(Year), y = Count, color = Serotype)) +
+  geom_line() +
+  theme_bw() +
+  labs(x = "Year", y = "Count", title = "Pneumococcal Disease due to Serotypes in PCV10 Over Time")
+```
+
+```{r}
 
 ```
