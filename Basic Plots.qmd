@@ -1,5 +1,5 @@
 ---
-title: "time_series"
+title: "Basic Plots"
 format: html
 editor: visual
 ---
@@ -57,6 +57,26 @@ ggplot(data = nepal_plot_data_PCV10, aes(x = as.numeric(Year), y = Count, color 
   labs(x = "Year", y = "Count", title = "Pneumococcal Disease due to Serotypes in PCV10 Over Time")
 ```
 
-```{r}
+```{r same code as above, but with proportions instead of counts}
+# getting data ready for plotting
+nepal_plot_data_prop <- nepal %>%
+  # select serotype + year columns
+  select(Serotype, X2014p, X2015p, X2017p, X2018p, X2019p, X2021p) %>%
+  # format data frame
+  pivot_longer(cols = -Serotype,
+               names_to = "Year",
+               values_to = "Proportion") %>%
+  # remove X and n from the years
+  mutate(Year = gsub("X|p", "", Year)) %>%
+  # filter out pcv10serotypes & the total rows
+  filter((!Serotype %in% pcv10serotypes) & (!Serotype=="Total"))
+
+nepal_plot_data_prop
+
+# plot serotype trends over time
+ggplot(data = nepal_plot_data_prop, aes(x = as.numeric(Year), y = Proportion, color = Serotype)) +
+  geom_line() +
+  theme_bw() +
+  labs(x = "Year", y = "Proportion", title = "Pneumococcal Disease Proportions by Serotype Over Time")
 
 ```
