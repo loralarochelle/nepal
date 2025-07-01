@@ -113,58 +113,6 @@ p1a <- p1 +
               aes(ymin = conf.low.disease, 
                   ymax = conf.high.disease), 
               alpha = 0.2, fill = "lightblue") +
-  labs(title = "Counts with Negative Binomial Fit")
+  labs(title = "Negative Binomial Model of Prevalence of Pneumococcal Infection Over Time")
 p1a
 ```
-
-Data is FAR from over-dispersed, so a Poisson might work better?
-
-```{r poisson model fitting}
-df.gps.carriage <- df.gps2 %>%
-  filter(Disease_Status == "Carriage")
-mod.carriage <- glm(data = df.gps.carriage, count ~ index, family="poisson")
-pred.carriage <- predict(mod.carriage, type = "response", se.fit = TRUE)
-df.pred.carriage <- df.gps.carriage %>%
-  mutate(se.fit = pred.carriage$se.fit, 
-         pred.carriage = pred.carriage$fit) %>%
-  mutate(conf.low.carriage = pred.carriage - 1.96 * se.fit,
-         conf.high.carriage = pred.carriage + 1.96 * se.fit)
-
-df.gps.disease <- df.gps2 %>%
-  filter(Disease_Status == "Disease")
-mod.disease <- glm(data = df.gps.disease, count ~ index, family="poisson")
-pred.disease <- predict(mod.disease, type = "response", se.fit = TRUE)
-df.pred.disease <- df.gps.disease %>%
-  mutate(se.fit = pred.disease$se.fit, 
-         pred.disease = pred.disease$fit) %>%
-  mutate(conf.low.disease = pred.disease - 1.96 * se.fit,
-         conf.high.disease = pred.disease + 1.96 * se.fit)
-
-p1b <- p1 +
-  geom_line(data = df.pred.carriage, 
-            aes(x = Year, y = pred.carriage),
-            color = "red") +
-  geom_ribbon(data = df.pred.carriage, 
-              aes(ymin = conf.low.carriage, 
-                  ymax = conf.high.carriage), 
-              alpha = 0.2, fill = "blue") +
-  geom_line(data = df.pred.disease, 
-            aes(x = Year, y = pred.disease),
-            color = "blue") +
-  geom_ribbon(data = df.pred.disease, 
-              aes(ymin = conf.low.disease, 
-                  ymax = conf.high.disease), 
-              alpha = 0.2, fill = "lightblue") +
-  labs(title = "Counts with Poisson Fit")
-```
-
-Comparing the two model fits:
-
-```{r comparing negative binomial and poisson}
-grid.arrange(
-  p1a + theme(legend.position = "none"),
-  p1b + theme(legend.position = "none"),
-  nrow = 1)
-```
-
-I'll work on adding the counterfactuals tomorrow!
