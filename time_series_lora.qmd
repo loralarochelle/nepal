@@ -75,6 +75,8 @@ p1
 ```
 
 ```{r negative binomial model fitting}
+df.gps2 <- tibble::rownames_to_column(df.gps2, var = "index") %>%
+  mutate(index = as.numeric(index))
 
 df.gps.carriage <- df.gps2 %>%
   filter(Disease_Status == "Carriage")
@@ -115,7 +117,7 @@ p1a <- p1 +
 p1a
 ```
 
-Data is FAR from overdispersed, so a Poisson might work better?
+Data is FAR from over-dispersed, so a Poisson might work better?
 
 ```{r poisson model fitting}
 df.gps.carriage <- df.gps2 %>%
