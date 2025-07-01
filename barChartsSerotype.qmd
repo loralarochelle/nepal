@@ -1,0 +1,398 @@
+---
+title: "exploringNepal"
+format: pdf
+editor: visual
+---
+
+```{r}
+# Loading in required libraries
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+```
+
+Making a bar chart of the serotypes in each of the four vaccines
+
+```{r}
+# Reading in the csv
+nepal2Df = read.csv("nepal_gps.csv")
+nepal2Df
+```
+
+```{r}
+# Loading in the typhoid data set used for offset
+typhoidDf = read.csv("typhoidMetadata.csv")
+typhoidDf
+```
+
+```{r}
+names(typhoidDf)[names(typhoidDf) == "year"] <- "Year"
+```
+
+```{r}
+# Creating a new column that is the counts of the cases for each year
+typhoidDf_grouped <- typhoidDf %>%
+  group_by(Year) %>%
+  mutate(typhoidCount = n()) %>%
+  filter(Year > 2008 & Year < 2019) %>%
+  dplyr::select(Year, typhoidCount)
+
+t2 <- typhoidDf_grouped %>%
+   group_by(Year, typhoidCount) %>%
+   summarize(.groups = 'drop')
+
+# Creating a new column that is the counts of cases in each year
+
+nepal2DfGrouped <- nepal2Df %>%
+  group_by(Year) %>%
+  mutate(IPDCount = n()) %>%
+  dplyr::select(Year, IPDCount)
+    
+nepal2DfSelected <- nepal2DfGrouped %>%    
+   group_by(Year, IPDCount) %>%
+   summarize(.groups = 'drop')
+
+# Adding the typhoid counts to the nepal IPD dataset
+mergedDF <- merge(nepal2DfSelected, t2, by = "Year")
+```
+
+```{r}
+
+```
+
+```{r}
+# Filtering the dataset
+nepalForBarChart <- nepal2Df %>%
+  dplyr::select(In_silico_serotype, PCV7, PCV13, PCV15, PCV20)
+
+View(nepalForBarChart)
+```
+
+```{r}
+# Creating bar charts for each of the four vaccines based on the serotypes they have
+ggplot(nepalForBarChart, aes(x = PCV7, fill = In_silico_serotype)) +
+  geom_bar() +                    
+  labs(y = "Frequency", x = "Response") 
+
+ggplot(nepalForBarChart, aes(x = PCV13, fill = In_silico_serotype)) +
+  geom_bar() +                    
+  labs(y = "Frequency", x = "Response") 
+
+
+ggplot(nepalForBarChart, aes(x = PCV15, fill = In_silico_serotype)) +
+  geom_bar() +                    
+  labs(y = "Frequency", x = "Response") +
+  theme_minimal()
+
+ggplot(nepalForBarChart, aes(x = PCV20, fill = In_silico_serotype)) +
+  geom_bar() +                    
+  labs(y = "Frequency", x = "Response") +
+  theme_minimal()
+```
+
+```         
+# Identifying the unique serotypes in the dataset
+unique(nepal2Df$In_silico_serotype)
+```
+
+-   
+
+-   
+
+```{r}
+pcv10_serotypes <- c('1', '4', '5', '6B', '7F', '9V', '14', '18C', '19F', '23F')
+
+nepalForBarChart$PCV10_group <- ifelse(nepalForBarChart$In_silico_serotype %in% pcv10_serotypes,"PCV10", "Non-PCV10")
+```
+
+```{r}
+pcv7df <- data.frame(
+  Vaccine = "PCV7",
+  Response = nepalForBarChart$PCV7,
+  PCV10_group = nepalForBarChart$PCV10_group,
+  Serotype = nepalForBarChart$In_silico_serotype
+)
+
+pcv13df <- data.frame(
+  Vaccine = "PCV13",
+  Response = nepalForBarChart$PCV13,
+  PCV10_group = nepalForBarChart$PCV10_group,
+  Serotype = nepalForBarChart$In_silico_serotype
+)
+
+pcv15df <- data.frame(
+  Vaccine = "PCV15",
+  Response = nepalForBarChart$PCV15,
+  PCV10_group = nepalForBarChart$PCV10_group,
+  Serotype = nepalForBarChart$In_silico_serotype
+)
+
+pcv20df <- data.frame(
+  Vaccine = "PCV20",
+  Response = nepalForBarChart$PCV20,
+  PCV10_group = nepalForBarChart$PCV10_group,
+  Serotype = nepalForBarChart$In_silico_serotype
+)
+
+# Combine all four into one dataframe
+combined <- rbind(pcv7df, pcv13df, pcv15df, pcv20df)
+```
+
+```{r}
+
+```
+
+```{r}
+## Need to filter out the four random categories above
+# Creating four bar charts of each vaccine and their serotypes that are PCV10
+ggplot(combined, aes(x = Response, fill = PCV10_group)) +
+  geom_bar() +
+  facet_grid(. ~ Vaccine) +
+  labs(x = "Serotype Response", y = "Frequency", fill = "PCV10 Group") +
+  theme_minimal()
+```
+
+```{r}
+# Finding the unique column names
+colnames(nepal2Df)
+```
+
+```{r}
+# I want to be able to grey out the PCV10 serotypes but idk how
+ggplot(combined, aes(x = Response, fill = Serotype)) +
+  geom_bar() +
+  facet_grid(. ~ Vaccine) +
+  labs(x = "Serotype", y = "Frequency", fill = "Serotype") +
+  theme_minimal()
+```
+
+```{r}
+# Estimation when the vaccine was introduced
+vax.intro.date <- as.Date('2015-01-01')
+vax.intro.year <- format(vax.intro.date, "%Y")
+
+# Date when vaccine efficacy evaluations started; at least 
+# 12 months following administration.
+vax.eval.date <- as.Date('2016-01-01')
+vax.eval.year <- format(vax.eval.date, "%Y")
+```
+
+```{r}
+# For modeling, we need to use an ordered, discrete variable. Simply, we 
+# can use the rownames for this purpose.
+nepalPivotedDf <- tibble::rownames_to_column(mergedDF, var = "index") %>%
+  mutate(index = as.numeric(index))
+```
+
+```{r}
+# Attempting method one of time series
+# Interrupted time series with disconnected segments
+
+# Creating the 'dummy' variables that are 0 before introduction of vaccine and 1 during vaccine efficacy evaluation stage
+
+nepalPivotedDf <- nepalPivotedDf %>%
+  mutate(
+    period1 = ifelse(Year >= vax.intro.year, 1, 0),
+    period2 = ifelse(Year >= vax.eval.year, 1, 0)
+  )
+
+# Viewing the changes
+nepalPivotedDf[, c("index", "Year", "period1", "period2")]
+```
+
+```{r}
+
+
+```
+
+```{r}
+nepalPivotedDf <- nepalPivotedDf %>%
+  filter(Year != 2014)
+
+# Creating the offsets by selecting all tyhpoid cases
+nepalPivotedDf$log.offset <- log(nepalPivotedDf$typhoidCount)
+```
+
+```{r}
+mod3 <- glm.nb(IPDCount ~ index  + offset(log.offset) +
+          # Finding the change in disease during administration and evaluation period
+          period1  + period2, data = nepalPivotedDf)
+
+summary(mod3)
+```
+
+```{r}
+p1 <- 
+  ggplot(nepalPivotedDf, aes(x = Year, y = IPDCount)) +
+      geom_point() +
+      labs(title = "Infections Scatter Plot",
+         x = "Year", y = "Counts") +
+      # Have y-axis for the two plots be the same.
+      #ylim(0, NA) +
+      theme_linedraw() +
+      # Specify aspects of the theme plot formatting settings.
+      theme(panel.spacing = unit(2, 'lines'), 
+            axis.text.x = element_text(angle = 90))
+
+p1
+```
+
+```{r}
+# Make predictions with confidence intervals.
+pred4 <- predict(mod3, type = "response", se.fit = TRUE)
+
+# Add the model predictions and 95% COI to the dataframe.
+nepalPivotedDf.pred.its <- nepalPivotedDf %>%
+  mutate(se.fit = pred4$se.fit, pred = pred4$fit) %>%
+  mutate(
+    conf.low = pred - 1.96 * se.fit,
+    conf.high = pred + 1.96 * se.fit
+  )
+
+# Plot the newly created model fitting.
+p4 <- p1 +
+  # Add the fitting line.
+  geom_line(data = nepalPivotedDf.pred.its, aes(x = Year, y = pred),
+            color = "#377eb8") +
+  # Add the confidence interval.
+  geom_ribbon(data = nepalPivotedDf.pred.its, aes(ymin = conf.low, ymax = conf.high), 
+              alpha = 0.2, fill = "blue") +
+  # Change the title name.
+  labs(title = "Infections with a Negative Binomial Fit\nInterupted Time Series")
+
+p4
+```
+
+```{r}
+# Initialize the vacccine effect variables by setting them to 0.
+nepalPivotedDf.counterfactual <- nepalPivotedDf
+nepalPivotedDf.counterfactual$period1 <- 0
+nepalPivotedDf.counterfactual$period2 <- 0
+
+# Generate the fitted values.
+nepalPivotedDf.pred.its$pred4.cf <- predict(mod3, type = "response", 
+  # Extract fitted value and add to df.pred.
+  newdata = nepalPivotedDf.counterfactual)
+
+# Overlay onto plot.
+p4 +
+ geom_line(data = nepalPivotedDf.pred.its, aes(x = Year, y = pred4.cf),
+           color='#e41a1c', lty = 2)
+
+# Only do carriage once combined with non gps
+```
+
+```{r}
+# Generate the rate ratio between the fitted and counterfactual values.
+nepalPivotedDf.pred.its$rr.its <- nepalPivotedDf.pred.its$pred/nepalPivotedDf.pred.its$pred4.cf
+
+p6 <- 
+  ggplot(nepalPivotedDf.pred.its, aes(x = Year, y = rr.its)) +
+      geom_line() +
+      labs(title = "Rate Ratio for the ITS Mode",
+         x = "Year", y = "Rate ratio") +
+      theme_linedraw() +
+      # Specify aspects of the theme plot formatting settings.
+      theme(panel.spacing = unit(2, 'lines'), 
+            axis.text.x = element_text(angle = 90)) +
+      geom_hline(yintercept = 1, col = "gray", lty = 2)
+
+p6
+```
+
+```{r}
+# A slightly more complicated model where the slope of the line is also allowed to vary in the post vaccine period
+mod3a <- glm.nb(IPDCount~index + Year + offset(log.offset) +
+                 # Add the counterfactuals with an interaction term.
+                 period1 + period1*index +
+                 period2 + period2*index, data=nepalPivotedDf)
+
+summary( mod3a)
+AIC(mod3, mod3a)
+```
+
+# Time Series Method 2
+
+```{r}
+intro.index <- which(nepalPivotedDf$Year == year(vax.intro.date))
+eval.index <- which(nepalPivotedDf$Year == year(vax.eval.date))
+
+nepalPivotedDf <- nepalPivotedDf %>%
+  mutate(
+    spl1 = ifelse(index - intro.index + 1 < 0, 0, index - intro.index + 1),
+    spl2 = ifelse(index - eval.index + 1 < 0, 0, index - eval.index + 1)
+  )
+
+# Inspect the changes.
+nepalPivotedDf[c("Year", "index", "spl1", "spl2")]
+```
+
+```{r}
+mod4 <- glm.nb(IPDCount ~ index + Year + offset(log.offset) +
+                 # Post-vaccine changes.
+                 spl1 + spl2, data = nepalPivotedDf)
+
+summary(mod4)
+```
+
+```{r}
+# Add the prediction using the smoothed model.
+nepalPivotedDf.pred.spl <- nepalPivotedDf %>%
+  mutate(pred.spl = predict(mod4, type = "response"))
+
+# Initialize the vacccine effect variables by setting them to 0.
+nepalPivotedDf.counterfactual.spl <- nepalPivotedDf
+nepalPivotedDf.counterfactual.spl$spl1 <- 0
+nepalPivotedDf.counterfactual.spl$spl2 <- 0
+
+# Generate the fitted values.
+nepalPivotedDf.pred.spl$pred.spl.cf <- predict(mod4, type = "response", 
+  # Extract fitted value and add to df.pred.
+  newdata = nepalPivotedDf.counterfactual.spl)
+```
+
+```{r}
+# Make predictions with confidence intervals.
+pred7 <- predict(mod4, type = "response", se.fit = TRUE)
+
+# Add the model predictions and 95% COI to the dataframe.
+nepalPivotedDf.pred.spl <- nepalPivotedDf.pred.spl %>%
+  mutate(se.fit = pred7$se.fit, pred = pred7$fit) %>%
+  mutate(
+    conf.low = pred - 1.96 * se.fit,
+    conf.high = pred + 1.96 * se.fit
+  )
+
+
+p7 <- 
+  ggplot(nepalPivotedDf.pred.spl, aes(x = Year, y = IPDCount)) +
+      geom_point() +
+      # Add the fitted line.
+      geom_line(data = nepalPivotedDf.pred.spl, aes(x = Year, y = pred.spl),
+                color = "#377eb8") +
+      # Add the confidence interval.
+      geom_ribbon(data = nepalPivotedDf.pred.spl, aes(ymin = conf.low, ymax = conf.high),
+                  alpha = 0.2, fill = "blue") +
+      # Add the counterfactual line.
+      geom_line(data = nepalPivotedDf.pred.spl, aes(x = Year, y = pred.spl.cf),
+                color = "#e41a1c", lty = 2) +
+      labs(title = "Deaths with a Negative Binomial Fit\nITS with Spline Smoothing",
+         x = "Year", y = "Counts") +
+      theme_linedraw() +
+      # Specify aspects of the theme plot formatting settings.
+      theme(panel.spacing = unit(2, 'lines'), 
+            axis.text.x = element_text(angle = 90))
+
+p7
+```
+
+```{r}
+# Generate the rate ratio between the fitted and counterfactual values.
+nepalPivotedDf.pred.spl$rr.spline <- nepalPivotedDf.pred.spl$pred.spl/nepalPivotedDf.pred.spl$pred.spl.cf
+
+p8 <- p6 +
+     geom_line(data = nepalPivotedDf.pred.spl, aes(x = Year, y = rr.spline),
+               color = "red", lty = 2)
+
+p8
+```
