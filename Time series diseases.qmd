@@ -51,6 +51,7 @@ nepal_shortened$In_silico_serotype <- ifelse(
 library(dplyr)
 library(ggplot2)
 
+
 # Filter to relevant clinical manifestations
 nepal_filtered <- nepal_shortened %>%
   filter(Clinical_manifestation %in% c("MENINGITIS", "PNEUMONIA", "SEPSIS"))
@@ -70,6 +71,7 @@ ggplot(df_pie, aes(x = "", y = prop, fill = In_silico_serotype)) +
   theme_void() +
   labs(title = "Serotype Distribution by Clinical Manifestation",
        fill = "Serotype")
+
 
 ```
 
@@ -150,5 +152,77 @@ ggplot(nepal_shortened, aes(x = Year)) +
 
 ```{r}
 
+
+```
+
+```{}
+```
+
+```{}
+```
+
+```{}
+```
+
+```{}
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+vax.intro.year <- 2015
+target_conditions <- c("PNEUMONIA", "SEPSIS", "MENINGITIS")
+
+# Summarize yearly data
+yearly_summary <- nepal_shortened %>%
+  filter(!is.na(Clinical_manifestation)) %>%
+  group_by(Year) %>%
+  summarise(
+    n_total = n(),
+    n_target = sum(Clinical_manifestation %in% target_conditions),
+    prop_target = n_target / n_total
+  ) %>%
+  mutate(
+    index = Year - min(Year),
+    log_offset = log(n_total)  # optional
+  )
+
+# Fit model using all years (observed fit)
+mod_all <- glm(cbind(n_target, n_total - n_target) ~ index,
+               family = binomial(),
+               data = yearly_summary)
+
+# Fit model using only pre-vaccine years (counterfactual)
+mod_counterfactual <- glm(cbind(n_target, n_total - n_target) ~ index,
+                          family = binomial(),
+                          data = yearly_summary %>% filter(Year < vax.intro.year))
+
+# Add predictions from both models
+yearly_summary <- yearly_summary %>%
+  mutate(
+    predicted_observed = predict(mod_all, type = "response"),
+    predicted_counterfactual = predict(mod_counterfactual, newdata = ., type = "response")
+  )
+
+```
+
+```{r}
+ggplot(yearly_summary, aes(x = Year)) +
+  geom_point(aes(y = prop_target), color = "black") +
+  geom_line(aes(y = predicted_observed), color = "#377eb8", linewidth = 1.2) +
+  geom_line(aes(y = predicted_counterfactual), color = "#e41a1c", linetype = "dashed", linewidth = 1.2) +
+  geom_vline(xintercept = vax.intro.year, linetype = "dotted") +
+  labs(
+    title = "Observed vs Counterfactual Proportion of Target Clinical Manifestations",
+    y = "Proportion (Pneumonia, Sepsis, or Meningitis)",
+    x = "Year"
+  ) +
+  theme_minimal()
+
+```
+```{r}
+
+group_by(nepal_gps, Year)
 
 ```

@@ -1,0 +1,100 @@
+---
+title: "copy of timeseries example"
+format: html
+editor: visual
+---
+
+## Quarto
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+
+## Running Code
+
+When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{r}
+1 + 1
+```
+
+You can add options to executable code like this
+
+```{r}
+#| echo: false
+2 * 2
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
+
+### Method #3: Extrapolation Based on the Pre-Vaccine Period
+
+First set the pneumonia variable to NA during the post-vaccine period
+
+```{r}
+df$J12_J18_prim_pre <- df$J12_J18_prim  df$J12_J18_prim_pre[which(df$date >= vax.intro.date)] <- NA  df[, c("date", "J12_J18_prim_pre")]
+```
+
+```{r}
+mod5<- glm.nb(J12_J18_prim_pre ~ index # Time trend
+              + month # Seasonality
+              + offset(log.offset), data = df)
+
+# Add the prediction using the smoothed model.
+ds.pred.mod5 <- df %>%
+  mutate(pred.mod5 = predict(mod5, type = "response", newdata = df))
+```
+
+Plot the observed and extrapolated data. Note that here the comparison is the *observed* data with the model estimate extrapolated from the pre-vaccine period. This is different form the previous models where we were just comparing the model fitted value with the model fitted value with the vaccine-effects held to 0.
+
+```{r}
+# Make predictions with confidence intervals.
+pred7 <- predict(mod4, type = "response", se.fit = TRUE)
+
+# Add the model predictions and 95% COI to the dataframe.
+df.pred.spl <- df.pred.spl %>%
+  mutate(se.fit = pred7$se.fit, pred = pred7$fit) %>%
+  mutate(
+    conf.low = pred - 1.96 * se.fit,
+    conf.high = pred + 1.96 * se.fit
+  )
+
+
+
+p9 <- ggplot(ds.pred.mod5, aes(x=date, y=J12_J18_prim)) +
+      geom_point() +
+      ylab("J12-18, <1 yo") +
+      xlab("Date") +
+      theme_linedraw() +
+      theme(panel.spacing= unit(2,'lines') , axis.text.x=element_text(angle=90)) +
+      geom_hline(yintercept=0, col='gray', lty=2) +
+      geom_line(color='#377eb8', data=ds.pred.mod5, aes(x=date, y=pred.mod5))
+p9
+```
+
+```{r}
+ds.pred.mod5$rr.trend<-df$J12_J18_prim/ds.pred.mod5$pred.mod5 
+```
+
+##Let's compare the rate ratio estimates from the 3 models
+
+```{r}
+p8 +  geom_line(color='#377eb8',lwd=1, lty=1,data=ds.pred.mod5, aes(x=date, y=rr.trend)) 
+```
+
+## look at rate ratio during the evaluation period
+
+As a rough estimate of this, let's just average the point-by-point estimates of the rate ratio during the evaluation period.
+
+```{r}
+eval.period<-df$date> vax.eval.date
+
+rr.its.eval<- mean(df.pred.its$rr.its[eval.period])
+
+rr.spline.eval<- mean(df.pred.spl$rr.spline[eval.period])
+
+rr.trend.eval<- sum(ds.pred.mod5$J12_J18_prim[eval.period])/sum(ds.pred.mod5$pred.mod5[eval.period])
+
+round(c('ITS'=rr.its.eval,'Spline'=rr.spline.eval,'Trend Extrapolation'=rr.trend.eval ),2)
+
+#Percent decline
+100*(1- round(c('ITS'=rr.its.eval,'Spline'=rr.spline.eval,'Trend Extrapolation'=rr.trend.eval ),2))
+```
