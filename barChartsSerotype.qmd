@@ -396,3 +396,155 @@ p8 <- p6 +
 
 p8
 ```
+
+Now doing method one and two but with combined carriage data
+
+```{r}
+nepalNonGps <- read.csv("nepal.csv")
+nepalNonGps
+```
+
+```{r}
+
+```
+
+```{r}
+# Pivoting the non gps dataset
+nepalNonGpsCarriage <- nepalNonGps %>%
+  # Selecting year columns
+  dplyr::select(X2014n, X2015n, X2017n, X2018n, X2019n, X2021n) %>%
+  # Formating data frame
+  pivot_longer(cols = everything(),
+               names_to = "Year",
+               values_to = "Count") %>%
+  # Removing X and n from the year counts
+  mutate(Year = gsub("X|n", "", Year)) %>%
+  group_by(Year) %>%
+  slice_tail()
+
+nepalNonGpsCarriage
+```
+
+```{r}
+# Plotting the counts of carriage infections over time for non gps dataset
+ggplot(data = nepalNonGpsCarriage, aes(x = as.numeric(Year), y = Count)) +
+  geom_line() +
+  theme_bw() +
+  labs(x = "Year", y = "Count", title = "Pneumococcal Carriage Infection Counts Over Time")
+```
+
+```{r}
+# Selecting only carriage cases from nepal gps dataset
+nepalCarriage <- nepal2Df %>%
+  group_by(Year) %>%
+  mutate(IPDCount = n()) %>%
+  filter(Clinical_manifestation == "CARRIAGE") %>%
+  dplyr::select(Year, IPDCount)
+    
+nepalGroupedCarriage <- nepalCarriage %>% 
+   group_by(Year, IPDCount) %>%
+   summarize(.groups = 'drop')
+
+nepalGroupedCarriage
+```
+
+```{r}
+View(nepalNonGpsCarriage)
+View(nepalGroupedCarriage)
+```
+
+```{r}
+# Combining the two datasets
+mergedCarriageDf <- merge(nepalNonGpsCarriage, nepalGroupedCarriage, by = "Year", all = TRUE)
+mergedCarriageDf
+```
+
+```{r}
+```
+
+```{r}
+# Adding the total counts for carriage
+mergedCarriageDf$CCount <- rowSums(mergedCarriageDf[, c("Count", "IPDCount")], na.rm = TRUE)
+mergedCarriageDf
+```
+
+```{r}
+# For modeling, we need to use an ordered, discrete variable. Simply, we 
+# can use the rownames for this purpose.
+carriage2 <- tibble::rownames_to_column(mergedCarriageDf, var = "index") %>%
+  mutate(index = as.numeric(index))
+```
+
+```{r}
+# Creating the 'dummy' variables that are 0 before introduction of vaccine and 1 during vaccine efficacy evaluation stage
+
+carriage2 <- carriage2 %>%
+  mutate(
+    period1 = ifelse(Year >= vax.intro.year, 1, 0),
+    period2 = ifelse(Year >= vax.eval.year, 1, 0)
+  )
+
+# Viewing the changes
+carriage2[, c("index", "Year", "period1", "period2")]
+```
+
+```{r}
+
+# Adding the typhoid counts to the carriage2 dataset
+mergedCarriage2DF <- merge(carriage2, t2, by = "Year")
+```
+
+```{r}
+# Creating the offsets by selecting all tyhpoid cases
+mergedCarriage2DF$log.offset <- log(mergedCarriage2DF$typhoidCount)
+```
+
+```{r}
+mod3 <- glm.nb(CCount ~ index  + offset(log.offset) +
+          # Finding the change in disease during administration and evaluation period
+          period1  + period2, data = mergedCarriage2DF)
+
+summary(mod3)
+```
+
+```{r}
+p1 <- 
+  ggplot(mergedCarriage2DF, aes(x = Year, y = CCount)) +
+      geom_point() +
+      labs(title = "Carriage Infections Scatter Plot",
+         x = "Year", y = "Counts") +
+      # Have y-axis for the two plots be the same.
+      #ylim(0, NA) +
+      theme_linedraw() +
+      # Specify aspects of the theme plot formatting settings.
+      theme(panel.spacing = unit(2, 'lines'), 
+            axis.text.x = element_text(angle = 90))
+
+p1
+```
+
+```{r}
+# Make predictions with confidence intervals.
+pred4 <- predict(mod3, type = "response", se.fit = TRUE)
+
+# Add the model predictions and 95% COI to the dataframe.
+mergedCarriage2DF.pred.its <- mergedCarriage2DF %>%
+  mutate(se.fit = pred4$se.fit, pred = pred4$fit) %>%
+  mutate(
+    conf.low = pred - 1.96 * se.fit,
+    conf.high = pred + 1.96 * se.fit
+  )
+
+# Plot the newly created model fitting.
+p4 <- p1 +
+  # Add the fitting line.
+  geom_line(data = mergedCarriage2DF.pred.its, aes(x = Year, y = pred),
+            color = "#377eb8") +
+  # Add the confidence interval.
+  geom_ribbon(data = mergedCarriage2DF.pred.its, aes(ymin = conf.low, ymax = conf.high), 
+              alpha = 0.2, fill = "blue") +
+  # Change the title name.
+  labs(title = "Infections with a Negative Binomial Fit\nInterupted Time Series")
+
+p4
+```
