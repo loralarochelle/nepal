@@ -113,6 +113,7 @@ p1a <- p1 +
               aes(ymin = conf.low.disease, 
                   ymax = conf.high.disease), 
               alpha = 0.2, fill = "lightblue") +
-  labs(title = "Negative Binomial Model of Prevalence of Pneumococcal Infection Over Time")
+  labs(title = "Negative Binomial Fit of Pneumococcal Trends in Nepal")+
+  theme(plot.title = element_text(face="bold"))
 p1a
 ```

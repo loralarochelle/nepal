@@ -21,24 +21,37 @@ library(viridis)
 library(ggspatial)
 library(janitor)
 
-d1.hierarchical <- read.csv("nepal_gps.csv")
-View(d1.hierarchical)
+d1.h.sgroup <- read.csv("nepal_gps.csv")
 
 # Aggregate data
-serotype_year_counts <- d1.hierarchical %>% # making counts of serotype by year
+serotype_year_counts <- d1.h.sgroup %>% # making counts of serotype by year
   count(In_silico_serotype, Year, name = "cases") %>% # counting up the number of serotypes in each year
   complete(In_silico_serotype, Year, fill = list(cases = 0))
 
-#### NEED TO FILTER OUT IRRELEVANT SEROTYPES ######
-serotype_year_counts <- serotype_year_counts %>%
-  filter(Year >= 2009)
+pcv10_serotypes <- c('1', '4', '5', '6B', '7F', '9V', '14', '18C', '19F', '23F')
+pcv13_serotypes <- c('3', '6A', '19A')
+pcv15_serotypes <- c('22F', '33F')
+pcv20_serotypes <- c('8', '10A', '11A', '12F', '15B')
 
+serotype_year_counts$Serotype_group <- ifelse(
+  serotype_year_counts$In_silico_serotype %in% pcv10_serotypes, "PCV10",
+  ifelse(serotype_year_counts$In_silico_serotype %in% pcv13_serotypes, "PCV13",
+         ifelse(serotype_year_counts$In_silico_serotype %in% pcv15_serotypes, "PCV15",
+                ifelse(serotype_year_counts$In_silico_serotype %in% pcv20_serotypes, "PCV20",
+                       "OTHER"))))
+
+serotype_year_counts <- serotype_year_counts %>%
+  filter(Year >= 2009 & Year != 2014) %>%
+  filter(In_silico_serotype != "ALTERNATIVE_ALIB_NT"
+         & In_silico_serotype != "COVERAGE TOO LOW"
+         & In_silico_serotype != "SWISS_NT"
+         & In_silico_serotype != "UNTYPABLE")
+
+View(serotype_year_counts)
 # Assign numeric IDs for JAGS
 serotype_year_counts <- serotype_year_counts %>%
-  mutate(sero_id = as.integer(factor(In_silico_serotype)), # assigning IDs for serotypes
+  mutate(sero_id = as.integer(factor(Serotype_group)), # assigning IDs for serotypes
          year_id = as.integer(factor(Year))) # assigning IDs for the year
-
-serotype_year_counts
 
 # Create JAGS data list
 jdat <- list(
@@ -64,9 +77,9 @@ summary(samp)
 
 library(coda)
 par(mar = c(2, 2, 2, 2))  # smaller margins
-plot(samp)
+# plot(samp)
 # Density plots for parameters: these are what is random?
-densplot(samp, main = "Posterior Density for Parameters")
+# densplot(samp, main = "Posterior Density for Parameters")
 
 posterior_summary <- summary(samp)
 # rounds estimates for each posterior value to 3 places
@@ -150,8 +163,8 @@ serotype_year_counts$expected_cases <- exp(serotype_year_counts$expected_log_lam
 #plot
 ggplot(serotype_year_counts, aes(x = Year)) +
   geom_point(aes(y = cases), color = "blue", alpha = 0.5) +
-  geom_line(aes(y = expected_cases, group = In_silico_serotype), color = "red") +
-  facet_wrap(~ In_silico_serotype, scales = "free_y") +
+  geom_line(aes(y = expected_cases, group = Serotype_group), color = "red") +
+  facet_wrap(~ Serotype_group, scales = "free_y") +
   labs(y = "Cases", x = "Year", title = "Observed (points) vs Expected (lines) Cases by Serotype") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
