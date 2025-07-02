@@ -489,6 +489,14 @@ carriage2[, c("index", "Year", "period1", "period2")]
 ```
 
 ```{r}
+typhoidDf_grouped <- typhoidDf %>%
+  group_by(Year) %>%
+  mutate(typhoidCount = n()) %>%
+  dplyr::select(Year, typhoidCount)
+
+t2 <- typhoidDf_grouped %>%
+   group_by(Year, typhoidCount) %>%
+   summarize(.groups = 'drop')
 
 # Adding the typhoid counts to the carriage2 dataset
 mergedCarriage2DF <- merge(carriage2, t2, by = "Year")
@@ -500,6 +508,8 @@ mergedCarriage2DF$log.offset <- log(mergedCarriage2DF$typhoidCount)
 ```
 
 ```{r}
+#mergedCarriage2DF <- mergedCarriage2DF %>%
+#  filter(Year != 2014)
 mod3 <- glm.nb(CCount ~ index  + offset(log.offset) +
           # Finding the change in disease during administration and evaluation period
           period1  + period2, data = mergedCarriage2DF)
@@ -538,13 +548,268 @@ mergedCarriage2DF.pred.its <- mergedCarriage2DF %>%
 # Plot the newly created model fitting.
 p4 <- p1 +
   # Add the fitting line.
-  geom_line(data = mergedCarriage2DF.pred.its, aes(x = Year, y = pred),
+  geom_line(data = mergedCarriage2DF.pred.its, aes(x = Year, y = pred), group = 1,
             color = "#377eb8") +
   # Add the confidence interval.
-  geom_ribbon(data = mergedCarriage2DF.pred.its, aes(ymin = conf.low, ymax = conf.high), 
+  geom_ribbon(data = mergedCarriage2DF.pred.its, aes(ymin = conf.low, ymax = conf.high), group = 1, 
               alpha = 0.2, fill = "blue") +
   # Change the title name.
   labs(title = "Infections with a Negative Binomial Fit\nInterupted Time Series")
 
 p4
+```
+
+```{r}
+
+
+# Initialize the vacccine effect variables by setting them to 0.
+mergedCarriage2DF.counterfactual <- mergedCarriage2DF
+mergedCarriage2DF.counterfactual$period1 <- 0
+mergedCarriage2DF.counterfactual$period2 <- 0
+
+# Generate the fitted values.
+mergedCarriage2DF.pred.its$pred4.cf <- predict(mod3, type = "response", 
+  # Extract fitted value and add to df.pred.
+  newdata = mergedCarriage2DF.counterfactual)
+
+# Overlay onto plot.
+p4 +
+ geom_line(data = mergedCarriage2DF.pred.its, aes(x = Year, y = pred4.cf),
+           color='#e41a1c', lty = 2, group = 1)
+```
+
+```{r}
+# Generate the rate ratio between the fitted and counterfactual values.
+mergedCarriage2DF.pred.its$rr.its <- mergedCarriage2DF.pred.its$pred/mergedCarriage2DF.pred.its$pred4.cf
+
+p6 <- 
+  ggplot(mergedCarriage2DF.pred.its, aes(x = Year, y = rr.its)) +
+      geom_line(group = 1) +
+      labs(title = "Rate Ratio for the ITS Mode",
+         x = "Year", y = "Rate ratio") +
+      theme_linedraw() +
+      # Specify aspects of the theme plot formatting settings.
+      theme(panel.spacing = unit(2, 'lines'), 
+            axis.text.x = element_text(angle = 90)) +
+      geom_hline(yintercept = 1, col = "gray", lty = 2)
+
+p6
+```
+
+```{r}
+# Adding in empty rows in the dataset so year goes up by 1 each time
+#emptyYears <- data.frame(Year  = c(2010, 2011, 2013, 2016))
+#mergedTest <- merge(mergedCarriage2DF, emptyYears, by = "Year", all = TRUE)
+```
+
+```{r}
+method3Carriage <- tibble::rownames_to_column(mergedCarriage2DF, var = "index3") %>%
+ mutate(index3 = as.numeric(index3))
+```
+
+```{r}
+# A slightly more complicated model where the slope of the line is also allowed to vary in the post vaccine period
+mod3a <- glm.nb(CCount ~ index3 + offset(log.offset) +
+                 # Add the counterfactuals with an interaction term.
+                 period1 + period1*index3 +
+                 period2 + period2*index3, data = method3Carriage)
+ 
+summary(mod3a)
+AIC(mod3, mod3a)
+```
+
+Method Two
+
+```{r}
+# Changing the eval date because there is no 2016
+vax.eval.date <- as.Date('2017-01-01')
+vax.eval.year <- format(vax.eval.date, "%Y")
+
+intro.index <- which(method3Carriage$Year == year(vax.intro.date))
+eval.index <- which(method3Carriage$Year == year(vax.eval.date))
+
+intro.index <- as.numeric(intro.index)
+eval.index <- as.numeric(eval.index)
+
+method3Carriage <- method3Carriage %>%
+  mutate(
+    spl1 = ifelse(index3 - intro.index + 1 < 0, 0, index3 - intro.index + 1),
+    spl2 = ifelse(index3 - eval.index + 1 < 0, 0, index3  - eval.index + 1)
+  )
+
+# Inspect the changes.
+method3Carriage[c("Year", "index", "spl1", "spl2")]
+```
+
+```{r}
+
+```
+
+```{r}
+method3Carriage <- method3Carriage %>%
+  filter(Year != 2014)
+mod4 <- glm.nb(CCount ~ index3  + offset(log.offset) +
+                 # Post-vaccine changes.
+                 spl1 + spl2, data = method3Carriage)
+
+summary(mod4)
+```
+
+```{r}
+# Add the prediction using the smoothed model.
+method3Carriage.pred.spl <- method3Carriage %>%
+  mutate(pred.spl = predict(mod4, type = "response"))
+
+# Initialize the vacccine effect variables by setting them to 0.
+method3Carriage.counterfactual.spl <- method3Carriage
+method3Carriage.counterfactual.spl$spl1 <- 0
+method3Carriage.counterfactual.spl$spl2 <- 0
+
+# Generate the fitted values.
+method3Carriage.pred.spl$pred.spl.cf <- predict(mod4, type = "response", 
+  # Extract fitted value and add to df.pred.
+  newdata = method3Carriage.counterfactual.spl)
+```
+
+```{r}
+
+
+# Make predictions with confidence intervals.
+pred7 <- predict(mod4, type = "response", se.fit = TRUE)
+
+# Add the model predictions and 95% COI to the dataframe.
+method3Carriage.pred.spl <- method3Carriage.pred.spl %>%
+  mutate(se.fit = pred7$se.fit, pred = pred7$fit) %>%
+  mutate(
+    conf.low = pred - 1.96 * se.fit,
+    conf.high = pred + 1.96 * se.fit
+  )
+
+
+p7 <- 
+  ggplot(method3Carriage.pred.spl, aes(x = Year, y = CCount)) +
+      geom_point() +
+      # Add the fitted line.
+      geom_line(data = method3Carriage.pred.spl, aes(x = Year, y = pred.spl),
+                color = "#377eb8", group = 1) +
+      # Add the confidence interval.
+      geom_ribbon(data = method3Carriage.pred.spl, aes(ymin = conf.low, ymax = conf.high),
+                  alpha = 0.2, fill = "blue", group = 1) +
+      # Add the counterfactual line.
+      geom_line(data = method3Carriage.pred.spl, aes(x = Year, y = pred.spl.cf),
+                color = "#e41a1c", lty = 2, group = 1) +
+      labs(title = "Carriage Infections with a Negative Binomial Fit\nITS with Spline Smoothing",
+         x = "Year", y = "Counts") +
+      theme_linedraw() +
+      # Specify aspects of the theme plot formatting settings.
+      theme(panel.spacing = unit(2, 'lines'), 
+            axis.text.x = element_text(angle = 90))
+
+p7
+```
+
+```{r}
+# Generate the rate ratio between the fitted and counterfactual values.
+method3Carriage.pred.spl$rr.spline <- method3Carriage.pred.spl$pred.spl/method3Carriage.pred.spl$pred.spl.cf
+
+p8 <- p6 +
+     geom_line(data = method3Carriage.pred.spl, aes(x = Year, y = rr.spline),
+               color = "red", lty = 2)
+
+p8
+```
+
+typhoid dataset ends at 2019, so we left out 2021 from the nepal datasets
+
+Method three
+
+```{r}
+mergedCarriage2DF$CCount <- mergedCarriage2DF$CCount
+
+introYear <- year(vax.intro.date)
+mergedCarriage2DF$Year <- as.numeric(mergedCarriage2DF$Year)
+
+mergedCarriage2DF$CCount[which(mergedCarriage2DF$Year >= vax.intro.date)] <- NA
+
+mergedCarriage2DF[, c("Year", "CCount")]
+```
+
+```{r}
+mod5<- glm.nb(CCount ~ index # Time trend
+              + Year # Seasonality
+              + offset(log.offset), data = mergedCarriage2DF)
+
+# Add the prediction using the smoothed model.
+ds.pred.mod5 <- mergedCarriage2DF %>%
+  mutate(pred.mod5 = predict(mod5, type = "response", newdata = mergedCarriage2DF))
+```
+
+```{r}
+# Make predictions with confidence intervals.
+pred7 <- predict(mod4, type = "response", se.fit = TRUE)
+
+# Add the model predictions and 95% COI to the dataframe.
+mergedCarriage2DF.pred.spl <- mergedCarriage2DF.pred.spl %>%
+  mutate(se.fit = pred7$se.fit, pred = pred7$fit) %>%
+  mutate(
+    conf.low = pred - 1.96 * se.fit,
+    conf.high = pred + 1.96 * se.fit
+  )
+
+
+p7 <- 
+  ggplot(mergedCarriage2DF.pred.spl, aes(x = Year, y = CCount)) +
+      geom_point() +
+      # Add the fitted line.
+      geom_line(data = mergedCarriage2DF.pred.spl, aes(x = Year, y = pred.spl),
+                color = "#377eb8") +
+      # Add the confidence interval.
+      geom_ribbon(data = mergedCarriage2DF.pred.spl, aes(ymin = conf.low, ymax = conf.high),
+                  alpha = 0.2, fill = "blue") +
+      # Add the counterfactual line.
+      geom_line(data = mergedCarriage2DF.pred.spl, aes(x = Year, y = pred.spl.cf),
+                color = "#e41a1c", lty = 2) +
+      labs(title = "Carriage Infections with a Negative Binomial Fit\nITS with Spline Smoothing",
+         x = "Year", y = "Counts") +
+      theme_linedraw() +
+      # Specify aspects of the theme plot formatting settings.
+      theme(panel.spacing = unit(2, 'lines'), 
+            axis.text.x = element_text(angle = 90))
+
+
+
+p9 <- ggplot(ds.pred.mod5, aes(x=Year, y=CCount)) +
+      geom_point() +
+      ylab("Carriage Counts, <1 yo") +
+      xlab("Year") +
+      theme_linedraw() +
+      theme(panel.spacing= unit(2,'lines') , axis.text.x=element_text(angle=90)) +
+      geom_hline(yintercept=0, col='gray', lty=2) +
+      geom_line(color='#377eb8', data=ds.pred.mod5, aes(x=Year, y=pred.mod5))
+p9
+```
+
+```{r}
+ds.pred.mod5$rr.trend<-mergedCarriage2DF$CCount/ds.pred.mod5$pred.mod5
+
+```
+
+```{r}
+p8 +  geom_line(color='#377eb8',lwd=1, lty=1,data=ds.pred.mod5, aes(x=Year, y=rr.trend, group = 1))
+
+```
+
+```{r}
+eval.period<-mergedCarriage2DF$Year> vax.eval.date
+
+rr.its.eval<- mean(mergedCarriage2DF.pred.its$rr.its[eval.period])
+
+rr.spline.eval<- mean(mergedCarriage2DF.pred.spl$rr.spline[eval.period])
+
+rr.trend.eval<- sum(ds.pred.mod5$CCount[eval.period])/sum(ds.pred.mod5$pred.mod5[eval.period])
+
+round(c('ITS'=rr.its.eval,'Spline'=rr.spline.eval,'Trend Extrapolation'=rr.trend.eval ),2)
+
+#Percent decline
+100*(1- round(c('ITS'=rr.its.eval,'Spline'=rr.spline.eval,'Trend Extrapolation'=rr.trend.eval ),2))
 ```
