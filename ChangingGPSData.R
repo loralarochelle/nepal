@@ -1,6 +1,9 @@
 nepal2Df = read.csv("nepal_gps.csv")
 
 data_neg_pos <- nepal2Df
+
+
+
 data_neg_pos$ermB2 <- replace(nepal2Df$ermB, nepal2Df$ermB == "NEG", "ermbNEG") 
 data_neg_pos$ermB2 <- replace(nepal2Df$ermB, nepal2Df$ermB == "POS", "ermbPOS")
 data_neg_pos$mefA2 <- replace(nepal2Df$mefA, nepal2Df$mefA == "NEG", "mefANEG") 
