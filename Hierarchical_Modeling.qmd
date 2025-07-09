@@ -1,17 +1,14 @@
-```{r loading libraries& data}
+```{r loading libraries & data}
 library(dplyr)
 library(tidyr)
 library(stringr)
 library(reshape2)
 library(lubridate)
-# library(rgdal)
-# library(maptools)
 library(MASS)
 library(rjags)
 library(HDInterval)
 library(ggplot2)
 library(sf)
-#library(spData)
 library(areal)
 library(ggthemes)
 library(gridExtra)
@@ -21,12 +18,14 @@ library(wesanderson)
 library(viridis)
 library(ggspatial)
 library(janitor)
+library(coda)
+library(ggplot2)
 
 nepal <- read.csv("nepal.csv")
 nepal.gps <- read.csv("nepal_gps.csv")
 ```
 
-```{r make carriage and disease dfs}
+```{r making carriage dfs from nepal_gps & nepal datasets}
 # make list of serotypes included in each vaccine
 pcv10_serotypes <- c('1', '4', '5', '6B', '7F', '9V', '14', '18C', '19F', '23F')
 pcv13_serotypes <- c('3', '6A', '19A')
@@ -40,24 +39,25 @@ nepal.gps.carriage <- nepal.gps %>%
   filter(Clinical_manifestation == "CARRIAGE") %>%
   filter(Year >= 2009) %>%
   # filter out irrelevant serotypes
-  filter(!(In_silico_serotype %in% c("COVERAGE TOO LOW", "UNTYPABLE", "SWISS_NT"))) %>%
+  filter(!(In_silico_serotype %in% c("COVERAGE TOO LOW", "UNTYPABLE", "SWISS_NT", "ALTERNATIVE_ALIB_NT"))) %>%
   # combine non-PCV serotypes into "other" category
   mutate(In_silico_serotype = if_else(In_silico_serotype %in% all_pcv_serotypes, 
                                       In_silico_serotype, "Other")) %>%
   # group by year, serotype, and count
   group_by(Year, In_silico_serotype) %>%
-  summarize(count = n(), .groups = "drop") %>%
+  dplyr::summarize(count = n(), .groups = "drop") %>%
   rename(Serotype = In_silico_serotype) %>%
   # pivot into same form as nepal dataset: years as cols, values as counts, all NAs are 0
   pivot_wider(names_from = Year, values_from = count, values_fill = 0)
-View(nepal)
+
 # select only counts from the nepal dataset (not proportions), fix name to be just an int
-# nepal <- nepal %>%
-  # dplyr::select(Serotype, X2014n, X2015n, X2017n, X2018n, X2019n, X2021n) %>%
-  # rename_with(~ gsub("X|n", "", .x), starts_with("X"))
+nepal_new <- nepal %>%
+  dplyr::select(Serotype, X2014n, X2015n, X2017n, X2018n, X2019n, X2021n) %>%
+  rename_with(~ gsub("X|n", "", .x), starts_with("X")) %>%
+  filter(!(Serotype == "PCV10serotypes"))
 
 # join datasets together using full_join by serotype to get full carriage dataset
-nepal_carriage <- full_join(nepal, nepal.gps.carriage, by = "Serotype") %>%
+nepal_carriage <- full_join(nepal_new, nepal.gps.carriage, by = "Serotype") %>%
   mutate(across(-Serotype, ~ replace_na(.x, 0))) %>%
   # get rid of Total row: it is no longer correct
   filter(Serotype != "Total") %>%
@@ -66,6 +66,7 @@ nepal_carriage <- full_join(nepal, nepal.gps.carriage, by = "Serotype") %>%
                 .names = "{sub('.x$', '', .col)}")) %>%
   dplyr::select(-matches("\\.x$|\\.y$"))
 
+<<<<<<< HEAD
 #### GETTING JUST DISEASE DATA FROM GPS DATASET ####
 nepal_disease <- nepal.gps %>%
   filter(Clinical_manifestation != "CARRIAGE") %>%
@@ -230,34 +231,183 @@ carriage_serotype_year_counts <- carriage_serotype_year_counts %>%
   filter(Year >= 2009 & Year != 2014 & Year != 2021)
 
 # getting sums of counts for PCV13, PCV15, and PCV20 serotypes as rows as well 
+=======
+carriage_serotype_year_counts <- nepal_carriage %>%
+  pivot_longer(cols = -Serotype, names_to = "Year", values_to = "cases")
+
+>>>>>>> 99a7dd0f1b1bd9ec86b6985005be900082c526c4
 df_sums <- carriage_serotype_year_counts %>%
-  mutate(group = case_when(Serotype %in% pcv13_serotypes ~ "PCV13serotypes",
+  mutate(group = case_when(Serotype %in% pcv10_serotypes ~ "PCV10serotypes",
+                           Serotype %in% pcv13_serotypes ~ "PCV13serotypes",
                            Serotype %in% pcv15_serotypes ~ "PCV15serotypes",
                            Serotype %in% pcv20_serotypes ~ "PCV20serotypes")) %>%
   filter(!is.na(group)) %>%
   group_by(Serotype = group, Year) %>%
   summarise(cases = sum(cases), .groups = "drop")
-carriage_serotype_year_counts <- bind_rows(carriage_serotype_year_counts, df_sums)
+carriage_groups_df <- bind_rows(carriage_serotype_year_counts, df_sums)
 
-# Assign numeric IDs for JAGS
+carriage_groups <- carriage_groups_df %>%
+  filter(Serotype %in% c("Other", "PCV10serotypes", "PCV13serotypes", "PCV15serotypes", "PCV20serotypes"))
+
+# get total cases per serotype per year
+carriage_serotype_year_totals <- carriage_groups %>%
+  group_by(Year, Serotype) %>%
+  summarise(total_cases = sum(cases), .groups = "drop")
+# get total cases per year
+carriage_year_totals <- carriage_serotype_year_totals %>%
+  group_by(Year) %>%
+  summarise(year_total = sum(total_cases), .groups = "drop")
+# join & compute proportions, then multiply by 100 and round down
+carriage_serotype_proportions <- carriage_serotype_year_totals %>%
+  left_join(carriage_year_totals, by = "Year") %>%
+  mutate(proportion = total_cases / year_total,
+         Percent = floor(proportion * 100)) %>%
+  dplyr::select(Serotype, Year, Percent)
+```
+
+```{r carriage model - individual serotypes}
+# assign numeric IDs for JAGS
 carriage_serotype_year_counts <- carriage_serotype_year_counts %>%
   mutate(sero_id = as.integer(factor(Serotype)), # assigning IDs for serotypes
          year_id = as.integer(factor(Year))) # assigning IDs for the year
 
-# Create JAGS data list
+# create JAGS data list
 jdat <- list(
-  N = nrow(carriage_serotype_year_counts), # number of rows = number of cases
-  cases = carriage_serotype_year_counts$cases, # cases = cases
+  N = nrow(carriage_serotype_year_counts), # number of rows
+  cases = carriage_serotype_year_counts$cases, # cases
   sero_id = carriage_serotype_year_counts$sero_id, # serotype IDs
   year_id = carriage_serotype_year_counts$year_id, # year IDs
   n_sero = length(unique(carriage_serotype_year_counts$sero_id)), # number of unique serotypes
   n_year = length(unique(carriage_serotype_year_counts$year_id)) # number of years
 )
-
-library(rjags)
 source("Model2.R")
 model_path <- "Model2.R"
+# creates jags model based on the textConnection to the jcode file (Model2), using jdat
+mod <- jags.model(textConnection(jcode), data = jdat, n.chains = 2)
+update(mod, 1000)  # burn-in
+# generates posterior samples based on mu and beta, iterates 5000 times
+samp <- coda.samples(mod, variable.names = c("mu", "beta"), n.iter = 5000) 
+# summarizes samples: gives quantile for each variable
+# summary(samp)
+par(mar = c(2, 2, 2, 2))  # smaller margins
+# plot(samp)
+# densplot(samp, main = "Posterior Density for Parameters")
 
+posterior_summary <- summary(samp)
+# rounds estimates for each posterior value to 3 places
+round(posterior_summary$statistics, 3)  # means, SDs
+round(posterior_summary$quantiles, 3)   # 2.5%, 50%, 97.5%
+
+# creates matrix of all betas across all simulation runs
+beta_samples <- as.matrix(samp)[, grep("beta", colnames(as.matrix(samp)))]
+# gives mean of each beta across all simulation runs
+beta_means <- apply(beta_samples, 2, mean)
+# makes CI for each beta
+beta_ci <- apply(beta_samples, 2, quantile, probs = c(0.025, 0.975))
+
+# gives mean and CI
+df <- data.frame(param = colnames(beta_samples),
+                 mean = beta_means,
+                 lower = beta_ci[1, ],
+                 upper = beta_ci[2, ])
+
+### POSTERIOR ESTIMATES PLOT
+# ggplot(df, aes(x = param, y = mean)) +
+  # geom_point() +
+  # geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  # coord_flip() +
+  # labs(title = "Posterior Estimates for Beta", y = "Effect Size", x = "") +
+  # theme_minimal()
+
+#heatmap
+# Your original year and serotype info
+year_seq <- sort(unique(jdat$year_id))  # e.g., 2000:2006
+sero_seq <- 1:jdat$n_sero
+mean_year <- (length(year_seq) + 1) / 2
+
+# Create a dataframe of all serotype-year combinations
+pred_grid <- expand.grid(sero = sero_seq, year = year_seq)
+
+samp_mat <- as.matrix(samp)
+mu_means <- colMeans(samp_mat[, grep("^mu\\[", colnames(samp_mat))])
+
+# predict expected log incidence
+pred_grid$log_lambda <- mu_means[pred_grid$sero] +
+  beta_means[pred_grid$sero] * (pred_grid$year - mean_year)
+
+# back-transform to incidence
+pred_grid$lambda <- exp(pred_grid$log_lambda)
+
+### EXPECTED PLOT OF CASES BY SEROTYPE
+ggplot(pred_grid, aes(x = year, y = factor(sero), fill = lambda)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(name = "Expected\nCases", option = "C") +
+  labs(x = "Year", y = "Serotype", title = "Expected Cases by Year and Serotype") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 8))
+
+### ACTUAL PLOT OF CASES BY SEROTYPE
+ggplot(carriage_serotype_year_counts, aes(x = Year, y = Serotype, fill = cases)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "C", name = "Cases") +
+  labs(title = "Cases of Pneumococcal Carriage in Nepal\nby Serotype and Year",
+       x = "Year",
+       y = "Serotype") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size=15),
+        plot.title = element_text(face="bold",size=18))
+
+#model version
+mean_year <- (max(carriage_serotype_year_counts$year_id) + 1) / 2
+
+# Create a data frame with expected log lambda for each serotype-year
+carriage_serotype_year_counts$expected_log_lambda <- mu_means[carriage_serotype_year_counts$sero_id] + 
+  beta_means[carriage_serotype_year_counts$sero_id] * (carriage_serotype_year_counts$year_id - mean_year)
+
+# Convert to expected cases (lambda)
+carriage_serotype_year_counts$expected_cases <- exp(carriage_serotype_year_counts$expected_log_lambda)
+#plot
+model_plot <- ggplot(carriage_serotype_year_counts, aes(x = Year)) +
+  geom_point(aes(y = cases), color = "#6A0DAD", alpha = 0.5) +
+  geom_line(aes(y = expected_cases, group = Serotype), color = "#00356B") +
+  facet_wrap(~ Serotype, scales = "free_y") +
+  labs(y = "Cases", x = "Year", title = "Observed (points) vs Expected (lines) Cases by Serotype, Carriage") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.text = element_text(size=12),
+        axis.title = element_text(size=12),
+        plot.title = element_text(face="bold",size=15))
+
+ggsave("model_plot.jpeg", model_plot, width=10, height=6)
+
+custom_colors <- c(
+  "PCV10" = "#00356B",   # Yale Blue
+  "PCV13" = "#6A0DAD",   # Purple
+  "PCV15" = "#008080",   # Teal
+  "PCV20" = "#E69F00",   # Gold
+  "Other" = "#999999"    # Grey fallback
+)
+```
+
+```{r carriage model - serotypes grouped by vaccine}
+# Assign numeric IDs for JAGS
+carriage_groups <- carriage_groups %>%
+  mutate(sero_id = as.integer(factor(Serotype)), # assigning IDs for serotypes
+         year_id = as.integer(factor(Year))) # assigning IDs for the year
+
+# Create JAGS data list
+jdat <- list(
+  N = nrow(carriage_groups), # number of rows = number of cases
+  cases = carriage_groups$cases, # cases = cases
+  sero_id = carriage_groups$sero_id, # serotype IDs
+  year_id = carriage_groups$year_id, # year IDs
+  n_sero = length(unique(carriage_groups$sero_id)), # number of unique serotypes
+  n_year = length(unique(carriage_groups$year_id)) # number of years
+)
+source("Model2.R")
+model_path <- "Model2.R"
 # creates jags model based on the textConnection to the jcode file (Model2), using jdat
 mod <- jags.model(textConnection(jcode), data = jdat, n.chains = 2)
 update(mod, 1000)  # burn-in
@@ -265,8 +415,6 @@ update(mod, 1000)  # burn-in
 samp <- coda.samples(mod, variable.names = c("mu", "beta"), n.iter = 5000) 
 # summarizes samples: gives quantile for each variable
 summary(samp)
-
-library(coda)
 par(mar = c(2, 2, 2, 2))  # smaller margins
 # plot(samp)
 # densplot(samp, main = "Posterior Density for Parameters")
@@ -291,7 +439,6 @@ df <- data.frame(
   upper = beta_ci[2, ]
 )
 
-library(ggplot2)
 ggplot(df, aes(x = param, y = mean)) +
   geom_point() +
   geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
@@ -329,9 +476,7 @@ ggplot(pred_grid, aes(x = year, y = factor(sero), fill = lambda)) +
   theme_minimal() +
   theme(axis.text.y = element_text(size = 8))
 
-library(ggplot2)
-
-ggplot(carriage_serotype_year_counts, aes(x = Year, y = Serotype, fill = cases)) +
+ggplot(carriage_groups, aes(x = Year, y = Serotype, fill = cases)) +
   geom_tile(color = "white") +
   scale_fill_viridis_c(option = "C", name = "Cases") +
   labs(title = "IPD Cases by Serotype and Year",
@@ -341,17 +486,16 @@ ggplot(carriage_serotype_year_counts, aes(x = Year, y = Serotype, fill = cases))
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 #model version
-mean_year <- (max(carriage_serotype_year_counts$year_id) + 1) / 2
+mean_year <- (max(carriage_groups$year_id) + 1) / 2
 
 # Create a data frame with expected log lambda for each serotype-year
-carriage_serotype_year_counts$expected_log_lambda <- mu_means[carriage_serotype_year_counts$sero_id] + 
-  beta_means[carriage_serotype_year_counts$sero_id] * (carriage_serotype_year_counts$year_id - mean_year)
+carriage_groups$expected_log_lambda <- mu_means[carriage_groups$sero_id] + 
+  beta_means[carriage_groups$sero_id] * (carriage_groups$year_id - mean_year)
 
 # Convert to expected cases (lambda)
-carriage_serotype_year_counts$expected_cases <- exp(carriage_serotype_year_counts$expected_log_lambda)
-
+carriage_groups$expected_cases <- exp(carriage_groups$expected_log_lambda)
 #plot
-ggplot(carriage_serotype_year_counts, aes(x = Year)) +
+ggplot(carriage_groups, aes(x = Year)) +
   geom_point(aes(y = cases), color = "blue", alpha = 0.5) +
   geom_line(aes(y = expected_cases, group = Serotype), color = "red") +
   facet_wrap(~ Serotype, scales = "free_y") +
@@ -360,27 +504,186 @@ ggplot(carriage_serotype_year_counts, aes(x = Year)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-```{r hierarchical modeling disease}
-# disease_serotype_year_counts <- nepal_disease %>%
-  # pivot_longer(cols = -Serotype, names_to = "Year", values_to = "cases")
+```{r carriage serotype proportions}
+carriage_serotype_proportions
+
+# Assign numeric IDs for JAGS
+carriage_serotype_proportions <- carriage_serotype_proportions %>%
+  mutate(sero_id = as.integer(factor(Serotype)), # assigning IDs for serotypes
+         year_id = as.integer(factor(Year))) # assigning IDs for the year
+
+# Create JAGS data list
+jdat <- list(
+  N = nrow(carriage_serotype_proportions), # number of rows = number of cases
+  cases = carriage_serotype_proportions$Percent, # cases = cases
+  sero_id = carriage_serotype_proportions$sero_id, # serotype IDs
+  year_id = carriage_serotype_proportions$year_id, # year IDs
+  n_sero = length(unique(carriage_serotype_proportions$sero_id)), # number of unique serotypes
+  n_year = length(unique(carriage_serotype_proportions$year_id)) # number of years
+)
+source("Model2.R")
+model_path <- "Model2.R"
+# creates jags model based on the textConnection to the jcode file (Model2), using jdat
+mod <- jags.model(textConnection(jcode), data = jdat, n.chains = 2)
+update(mod, 1000)  # burn-in
+# generates posterior samples based on mu and beta, iterates 5000 times
+samp <- coda.samples(mod, variable.names = c("mu", "beta"), n.iter = 5000) 
+# summarizes samples: gives quantile for each variable
+summary(samp)
+par(mar = c(2, 2, 2, 2))  # smaller margins
+# plot(samp)
+# densplot(samp, main = "Posterior Density for Parameters")
+
+posterior_summary <- summary(samp)
+# rounds estimates for each posterior value to 3 places
+round(posterior_summary$statistics, 3)  # means, SDs
+round(posterior_summary$quantiles, 3)   # 2.5%, 50%, 97.5%
+
+# creates matrix of all betas across all simulation runs
+beta_samples <- as.matrix(samp)[, grep("beta", colnames(as.matrix(samp)))]
+# gives mean of each beta across all simulation runs
+beta_means <- apply(beta_samples, 2, mean)
+# makes CI for each beta
+beta_ci <- apply(beta_samples, 2, quantile, probs = c(0.025, 0.975))
+
+# gives mean and CI
+df <- data.frame(
+  param = colnames(beta_samples),
+  mean = beta_means,
+  lower = beta_ci[1, ],
+  upper = beta_ci[2, ]
+)
+
+ggplot(df, aes(x = param, y = mean)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  coord_flip() +
+  labs(title = "Posterior Estimates for Beta", y = "Effect Size", x = "") +
+  theme_minimal()
+
+#heatmap
+# Your original year and serotype info
+year_seq <- sort(unique(jdat$year_id))  # e.g., 2000:2006
+sero_seq <- 1:jdat$n_sero
+mean_year <- (length(year_seq) + 1) / 2
+
+# Create a dataframe of all serotype-year combinations
+pred_grid <- expand.grid(
+  sero = sero_seq,
+  year = year_seq
+)
+
+samp_mat <- as.matrix(samp)
+mu_means <- colMeans(samp_mat[, grep("^mu\\[", colnames(samp_mat))])
+
+
+# Predict expected log incidence
+pred_grid$log_lambda <- mu_means[pred_grid$sero] +
+  beta_means[pred_grid$sero] * (pred_grid$year - mean_year)
+
+# Back-transform to incidence
+pred_grid$lambda <- exp(pred_grid$log_lambda)
+
+ggplot(pred_grid, aes(x = year, y = factor(sero), fill = lambda)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(name = "Expected\nCases", option = "C") +
+  labs(x = "Year", y = "Serotype", title = "Expected Cases by Year and Serotype") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 8))
+
+ggplot(carriage_serotype_proportions, aes(x = Year, y = Serotype, fill = Percent)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "C", name = "Percent") +
+  labs(title = "Percent of IPD caused by Serotype Group and Year",
+       x = "Year",
+       y = "Serotype") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#model version
+mean_year <- (max(carriage_serotype_proportions$year_id) + 1) / 2
+
+# Create a data frame with expected log lambda for each serotype-year
+carriage_serotype_proportions$expected_log_lambda <- mu_means[carriage_serotype_proportions$sero_id] + 
+  beta_means[carriage_serotype_proportions$sero_id] * (carriage_serotype_proportions$year_id - mean_year)
+
+# Convert to expected cases (lambda)
+carriage_serotype_proportions$expected_cases <- exp(carriage_serotype_proportions$expected_log_lambda)
+#plot
+ggplot(carriage_serotype_proportions, aes(x = Year)) +
+  geom_point(aes(y = Percent), color = "blue", alpha = 0.5) +
+  geom_line(aes(y = expected_cases, group = Serotype), color = "red") +
+  facet_wrap(~ Serotype, scales = "free_y") +
+  labs(y = "Cases", x = "Year", title = "Observed (points) vs Expected (lines) Cases by Serotype, Carriage") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+carriage_serotype_proportions <- carriage_serotype_proportions %>%
+  mutate(Serotype = recode(Serotype,
+    "PCV10serotypes" = "PCV10 Serotypes",
+    "PCV13serotypes" = "Additional PCV13 (Non PCV10)",
+    "PCV15serotypes" = "Additional PCV15 (Non PCV13)",
+    "PCV20serotypes" = "Additional PCV20 (Non PCV15)"
+  ))
+
+
+custom_colors <- c(
+  "PCV10 Serotypes"    = "#00356B",
+  "Additional PCV13 (Non PCV10)"    = "#6A0DAD",
+  "Additional PCV15 (Non PCV13)"    = "#008080",
+  "Additional PCV20 (Non PCV15)"    = "#E69F00",
+  "Other"              = "#999999"
+)
+
+
+ggplot(carriage_serotype_proportions, aes(x = as.integer(Year), y = Percent, group = Serotype, color = Serotype)) +
+  geom_point(alpha = 0.6) +
+  geom_line(aes(y = expected_cases, group = Serotype)) +
+  scale_color_manual(values = custom_colors) +
+  labs(y = "Percent of Cases Per Year", x = "Year", title = "Percent of Total Pneumococcal Carriage Infections Per Year\nFrom Each Serotype Group", color = "Serotype Group") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title = element_text(size=15),
+        axis.text = element_text(size=13),
+        plot.title = element_text(size=15, face="bold"))
+```
+
+
+```{r making disease dfs from nepal_gps dataset}
+# getting only disease data
+nepal_disease <- nepal.gps %>%
+  filter(Clinical_manifestation != "CARRIAGE") %>%
+  mutate(Clinical_manifestation = "DISEASE") %>%
+  filter(Year >= 2009) %>%
+  # filter out irrelevant serotypes
+  filter(!(In_silico_serotype %in% c("COVERAGE TOO LOW", "UNTYPABLE", "SWISS_NT", "ALTERNATIVE_ALIB_NT"))) %>%
+  # combine non-PCV serotypes into "other" category
+  mutate(In_silico_serotype = if_else(In_silico_serotype %in% all_pcv_serotypes, 
+                                      In_silico_serotype, "Other")) %>%
+  rename(Serotype = In_silico_serotype) %>%
+  group_by(Year, Serotype) %>%
+  dplyr::summarize(count = n(), .groups = "drop")
 
 disease_serotype_year_counts <- nepal_disease
-
 colnames(disease_serotype_year_counts)[colnames(disease_serotype_year_counts) == "count"] <- "cases"
-
-disease_serotype_year_counts <- disease_serotype_year_counts %>% 
-  filter(Year >= 2009 & Year != 2014)
 
 # getting sums of counts for PCV13, PCV15, and PCV20 serotypes as rows as well 
 df_sums <- disease_serotype_year_counts %>%
-  mutate(group = case_when(Serotype %in% pcv13_serotypes ~ "PCV13serotypes",
+  mutate(group = case_when(Serotype %in% pcv10_serotypes ~ "PCV10serotypes",
+                           Serotype %in% pcv13_serotypes ~ "PCV13serotypes",
                            Serotype %in% pcv15_serotypes ~ "PCV15serotypes",
                            Serotype %in% pcv20_serotypes ~ "PCV20serotypes")) %>%
   filter(!is.na(group)) %>%
   group_by(Serotype = group, Year) %>%
   summarise(cases = sum(cases), .groups = "drop")
-disease_serotype_year_counts <- bind_rows(disease_serotype_year_counts, df_sums)
+disease_groups_df <- bind_rows(disease_serotype_year_counts, df_sums)
+disease_groups <- disease_groups_df %>%
+  filter(Serotype %in% c("Other", "PCV10serotypes", "PCV13serotypes", "PCV15serotypes", "PCV20serotypes"))
+View(disease_serotype_year_counts)
+View(disease_groups)
+```
 
+```{r disease model - individual serotypes}
 # Assign numeric IDs for JAGS
 disease_serotype_year_counts <- disease_serotype_year_counts %>%
   mutate(sero_id = as.integer(factor(Serotype)), # assigning IDs for serotypes
@@ -498,6 +801,265 @@ ggplot(disease_serotype_year_counts, aes(x = Year)) +
   geom_line(aes(y = expected_cases, group = Serotype), color = "red") +
   facet_wrap(~ Serotype, scales = "free_y") +
   labs(y = "Cases", x = "Year", title = "Observed (points) vs Expected (lines) Cases by Serotype, Disease") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r disease model - serotypes grouped by vaccine}
+# Assign numeric IDs for JAGS
+disease_groups <- disease_groups %>%
+  mutate(sero_id = as.integer(factor(Serotype)), # assigning IDs for serotypes
+         year_id = as.integer(factor(Year))) # assigning IDs for the year
+
+# Create JAGS data list
+jdat <- list(
+  N = nrow(disease_groups), # number of rows = number of cases
+  cases = disease_groups$cases, # cases = cases
+  sero_id = disease_groups$sero_id, # serotype IDs
+  year_id = disease_groups$year_id, # year IDs
+  n_sero = length(unique(disease_groups$sero_id)), # number of unique serotypes
+  n_year = length(unique(disease_groups$year_id)) # number of years
+)
+source("Model2.R")
+model_path <- "Model2.R"
+
+# creates jags model based on the textConnection to the jcode file (Model2), using jdat
+mod <- jags.model(textConnection(jcode), data = jdat, n.chains = 2)
+update(mod, 1000)  # burn-in
+# generates posterior samples based on mu and beta, iterates 5000 times
+samp <- coda.samples(mod, variable.names = c("mu", "beta"), n.iter = 5000) 
+# summarizes samples: gives quantile for each variable
+summary(samp)
+par(mar = c(2, 2, 2, 2))  # smaller margins
+# plot(samp)
+# densplot(samp, main = "Posterior Density for Parameters")
+
+posterior_summary <- summary(samp)
+# rounds estimates for each posterior value to 3 places
+round(posterior_summary$statistics, 3)  # means, SDs
+round(posterior_summary$quantiles, 3)   # 2.5%, 50%, 97.5%
+
+# creates matrix of all betas across all simulation runs
+beta_samples <- as.matrix(samp)[, grep("beta", colnames(as.matrix(samp)))]
+# gives mean of each beta across all simulation runs
+beta_means <- apply(beta_samples, 2, mean)
+# makes CI for each beta
+beta_ci <- apply(beta_samples, 2, quantile, probs = c(0.025, 0.975))
+
+# gives mean and CI
+df <- data.frame(
+  param = colnames(beta_samples),
+  mean = beta_means,
+  lower = beta_ci[1, ],
+  upper = beta_ci[2, ]
+)
+ggplot(df, aes(x = param, y = mean)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  coord_flip() +
+  labs(title = "Posterior Estimates for Beta", y = "Effect Size", x = "") +
+  theme_minimal()
+
+#heatmap
+# Your original year and serotype info
+year_seq <- sort(unique(jdat$year_id))  # e.g., 2000:2006
+sero_seq <- 1:jdat$n_sero
+mean_year <- (length(year_seq) + 1) / 2
+
+# Create a dataframe of all serotype-year combinations
+pred_grid <- expand.grid(
+  sero = sero_seq,
+  year = year_seq
+)
+
+samp_mat <- as.matrix(samp)
+mu_means <- colMeans(samp_mat[, grep("^mu\\[", colnames(samp_mat))])
+
+
+# Predict expected log incidence
+pred_grid$log_lambda <- mu_means[pred_grid$sero] +
+  beta_means[pred_grid$sero] * (pred_grid$year - mean_year)
+
+# Back-transform to incidence
+pred_grid$lambda <- exp(pred_grid$log_lambda)
+
+ggplot(pred_grid, aes(x = year, y = factor(sero), fill = lambda)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(name = "Expected\nCases", option = "C") +
+  labs(x = "Year", y = "Serotype", title = "Expected Cases by Year and Serotype") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 8))
+
+ggplot(disease_groups, aes(x = Year, y = Serotype, fill = cases)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "C", name = "Cases") +
+  labs(title = "IPD Cases by Serotype and Year",
+       x = "Year",
+       y = "Serotype") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#model version
+mean_year <- (max(disease_groups$year_id) + 1) / 2
+
+# Create a data frame with expected log lambda for each serotype-year
+disease_groups$expected_log_lambda <- mu_means[disease_groups$sero_id] + 
+  beta_means[disease_groups$sero_id] * (disease_groups$year_id - mean_year)
+
+# Convert to expected cases (lambda)
+disease_groups$expected_cases <- exp(disease_groups$expected_log_lambda)
+
+#plot
+ggplot(disease_groups, aes(x = Year)) +
+  geom_point(aes(y = cases), color = "blue", alpha = 0.5) +
+  geom_line(aes(y = expected_cases, group = Serotype), color = "red") +
+  facet_wrap(~ Serotype, scales = "free_y") +
+  labs(y = "Cases", x = "Year", title = "Observed (points) vs Expected (lines) Cases by Serotype, Disease") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r disease serotype proportions}
+# get total cases per serotype per year
+disease_serotype_year_totals <- disease_groups %>%
+  group_by(Year, Serotype) %>%
+  summarise(total_cases = sum(cases), .groups = "drop")
+
+# get total cases per year
+disease_year_totals <- disease_serotype_year_totals %>%
+  group_by(Year) %>%
+  summarise(year_total = sum(total_cases), .groups = "drop")
+# join & compute proportions, then multiply by 100 and round down
+disease_serotype_proportions <- disease_serotype_year_totals %>%
+  left_join(disease_year_totals, by = "Year") %>%
+  mutate(proportion = total_cases / year_total,
+         Percent = floor(proportion * 100)) %>%
+  dplyr::select(Serotype, Year, Percent)
+
+# Assign numeric IDs for JAGS
+disease_serotype_proportions <- disease_serotype_proportions %>%
+  mutate(sero_id = as.integer(factor(Serotype)), # assigning IDs for serotypes
+         year_id = as.integer(factor(Year))) # assigning IDs for the year
+
+# Create JAGS data list
+jdat <- list(
+  N = nrow(disease_serotype_proportions), # number of rows = number of cases
+  cases = disease_serotype_proportions$Percent, # cases = cases
+  sero_id = disease_serotype_proportions$sero_id, # serotype IDs
+  year_id = disease_serotype_proportions$year_id, # year IDs
+  n_sero = length(unique(disease_serotype_proportions$sero_id)), # number of unique serotypes
+  n_year = length(unique(disease_serotype_proportions$year_id)) # number of years
+)
+source("Model2.R")
+model_path <- "Model2.R"
+# creates jags model based on the textConnection to the jcode file (Model2), using jdat
+mod <- jags.model(textConnection(jcode), data = jdat, n.chains = 2)
+update(mod, 1000)  # burn-in
+# generates posterior samples based on mu and beta, iterates 5000 times
+samp <- coda.samples(mod, variable.names = c("mu", "beta"), n.iter = 5000) 
+# summarizes samples: gives quantile for each variable
+summary(samp)
+par(mar = c(2, 2, 2, 2))  # smaller margins
+# plot(samp)
+# densplot(samp, main = "Posterior Density for Parameters")
+
+posterior_summary <- summary(samp)
+# rounds estimates for each posterior value to 3 places
+round(posterior_summary$statistics, 3)  # means, SDs
+round(posterior_summary$quantiles, 3)   # 2.5%, 50%, 97.5%
+
+# creates matrix of all betas across all simulation runs
+beta_samples <- as.matrix(samp)[, grep("beta", colnames(as.matrix(samp)))]
+# gives mean of each beta across all simulation runs
+beta_means <- apply(beta_samples, 2, mean)
+# makes CI for each beta
+beta_ci <- apply(beta_samples, 2, quantile, probs = c(0.025, 0.975))
+
+# gives mean and CI
+df <- data.frame(
+  param = colnames(beta_samples),
+  mean = beta_means,
+  lower = beta_ci[1, ],
+  upper = beta_ci[2, ]
+)
+ggplot(df, aes(x = param, y = mean)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  coord_flip() +
+  labs(title = "Posterior Estimates for Beta", y = "Effect Size", x = "") +
+  theme_minimal()
+
+#heatmap
+# Your original year and serotype info
+year_seq <- sort(unique(jdat$year_id))  # e.g., 2000:2006
+sero_seq <- 1:jdat$n_sero
+mean_year <- (length(year_seq) + 1) / 2
+
+# Create a dataframe of all serotype-year combinations
+pred_grid <- expand.grid(
+  sero = sero_seq,
+  year = year_seq
+)
+
+samp_mat <- as.matrix(samp)
+mu_means <- colMeans(samp_mat[, grep("^mu\\[", colnames(samp_mat))])
+
+
+# Predict expected log incidence
+pred_grid$log_lambda <- mu_means[pred_grid$sero] +
+  beta_means[pred_grid$sero] * (pred_grid$year - mean_year)
+
+# Back-transform to incidence
+pred_grid$lambda <- exp(pred_grid$log_lambda)
+
+ggplot(pred_grid, aes(x = year, y = factor(sero), fill = lambda)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(name = "Expected\nCases", option = "C") +
+  labs(x = "Year", y = "Serotype", title = "Expected Cases by Year and Serotype") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 8))
+
+ggplot(disease_serotype_proportions, aes(x = Year, y = Serotype, fill = Percent)) +
+  geom_tile(color = "white") +
+  scale_fill_viridis_c(option = "C", name = "Percent") +
+  labs(title = "IPD Disease Cases by Serotype Group and Year",
+       x = "Year",
+       y = "Serotype") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#model version
+mean_year <- (max(disease_serotype_proportions$year_id) + 1) / 2
+
+# Create a data frame with expected log lambda for each serotype-year
+disease_serotype_proportions$expected_log_lambda <- mu_means[disease_serotype_proportions$sero_id] + 
+  beta_means[disease_serotype_proportions$sero_id] * (disease_serotype_proportions$year_id - mean_year)
+
+# Convert to expected cases (lambda)
+disease_serotype_proportions$expected_cases <- exp(disease_serotype_proportions$expected_log_lambda)
+
+#plot
+ggplot(disease_serotype_proportions, aes(x = Year)) +
+  geom_point(aes(y = Percent), color = "blue", alpha = 0.5) +
+  geom_line(aes(y = expected_cases, group = Serotype), color = "red") +
+  facet_wrap(~ Serotype, scales = "free_y") +
+  labs(y = "Cases", x = "Year", title = "Observed (points) vs Expected (lines) Cases by Serotype, Disease") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+custom_colors <- c(
+  "PCV10serotypes" = "#00356B",   # Yale Blue
+  "PCV13serotypes" = "#6A0DAD",   # Purple
+  "PCV15serotypes" = "#008080",   # Teal
+  "PCV20serotypes" = "#E69F00",   # Gold
+  "Other" = "#999999"    # Grey fallback
+)
+
+ggplot(disease_serotype_proportions, aes(x = as.integer(Year), y = Percent, group = Serotype, color = Serotype)) +
+  geom_point(alpha = 0.6) +
+  geom_line(aes(y = expected_cases, group = Serotype)) +
+  scale_color_manual(values = custom_colors) +
+  labs(y = "Percent of Cases", x = "Year", title = "Percent of Total Pneumococcal Disease Infections Per Year From Each Serotype Group", color = "Serotype Group") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```

@@ -12,8 +12,6 @@ library(tidyverse)
 library(knitr)
 library(ggplot2)
 library(lubridate)
-install.packages("~/Downloads/arules_1.7-11.tar.gz", repos = NULL, type = "source")
-install.packages(c("Matrix", "slam"))
 library(arules)
 library(arulesViz)
 library(plyr)
@@ -140,14 +138,14 @@ these more stringent criteria mean that we're down to 115 rules to sort through.
 inspect(rules_b[1:10])
 ```
 
-try to look for only for rules associated with Strep_pneumo
+try to look for only for rules associated with Carriage
 
 ```{r}
 pneumo.rules<-sort(subset(rules_b, subset = rhs %in% "CARRIAGE"))
 
 inspect(pneumo.rules[1:10])
 ```
-now let's plot the pneumo rules:
+now let's plot the carriage rules:
 ```{r}
 plot(pneumo.rules, measure = c("support", "confidence"), shading = "lift", jitter=0)
 ```
