@@ -93,7 +93,7 @@ serotype_year_counts <- d1.hierarchical %>% # making counts of serotype by year
   complete(In_silico_serotype, Year, fill = list(cases = 0))
 
 serotype_year_counts <- serotype_year_counts %>%
-  filter(Year >= 2009 & Year != 2014) %>%
+  filter(Year != 2021 & Year != 2014) %>%
   filter(In_silico_serotype != "ALTERNATIVE_ALIB_NT"
          & In_silico_serotype != "COVERAGE TOO LOW"
          & In_silico_serotype != "SWISS_NT"
@@ -227,7 +227,7 @@ carriage_serotype_year_counts <- nepal_carriage %>%
   pivot_longer(cols = -Serotype, names_to = "Year", values_to = "cases")
 
 carriage_serotype_year_counts <- carriage_serotype_year_counts %>% 
-  filter(Year >= 2009 & Year != 2014)
+  filter(Year >= 2009 & Year != 2014 & Year != 2021)
 
 # getting sums of counts for PCV13, PCV15, and PCV20 serotypes as rows as well 
 df_sums <- carriage_serotype_year_counts %>%
