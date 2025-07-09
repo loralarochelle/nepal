@@ -9,7 +9,6 @@ editor: visual
 library(tidyverse)
 library(dplyr)
 library(ggplot2)
-library(MASS)
 ```
 
 Making a bar chart of the serotypes in each of the four vaccines
@@ -27,50 +26,49 @@ typhoidDf
 ```
 
 ```{r}
-# Defining the custom color palette
-custom_colors <- c(
-  "PCV10" = "#00356B",   # Yale Blue
-  "PCV13" = "#6A0DAD",   # Purple
-  "PCV15" = "#008080",   # Teal
-  "PCV20" = "#E69F00",   # Gold
-  "Other" = "#999999"    # Grey fallback
-)
-```
-
-```{r}
 # Renaming the year column for easy merging
 names(typhoidDf)[names(typhoidDf) == "year"] <- "Year"
 ```
 
 ```{r}
 # Creating a new column that is the counts of the cases for each year
-t2 <- typhoidDf %>%
+typhoidDf_grouped <- typhoidDf %>%
+  group_by(Year) %>%
+  mutate(typhoidCount = n()) %>%
   # Filtering out the years we don't want
   filter(Year > 2008 & Year < 2019) %>%
-  group_by(Year) %>%
-  dplyr::summarize(typhoidCount = n())
+  dplyr::select(Year, typhoidCount)
 
 # Making sure we only have one count for each year in the dataframe
-#t2 <- typhoidDf_grouped %>%
-#   group_by(Year, typhoidCount)
+t2 <- typhoidDf_grouped %>%
+   group_by(Year, typhoidCount) %>%
+   summarize(.groups = 'drop')
 
 # Creating a new column that is the counts of cases in each year
 nepal2DfGrouped <- nepal2Df %>%
   group_by(Year) %>%
-  dplyr::summarize(IPDCount = n()) 
-
+  mutate(IPDCount = n()) %>%
+  dplyr::select(Year, IPDCount)
+    
 # Making sure we only have one count for each year in the dataframe
-#nepal2DfSelected <- nepal2DfGrouped %>%    
-#   group_by(Year, IPDCount)
+nepal2DfSelected <- nepal2DfGrouped %>%    
+   group_by(Year, IPDCount) %>%
+   summarize(.groups = 'drop')
 
 # Adding the typhoid counts to the nepal IPD dataset
-mergedDF <- merge(nepal2DfGrouped, t2, by = "Year")
+mergedDF <- merge(nepal2DfSelected, t2, by = "Year")
+```
+
+```{r}
+
 ```
 
 ```{r}
 # Selecting the only columns we need
 nepalForBarChart <- nepal2Df %>%
   dplyr::select(In_silico_serotype, PCV7, PCV13, PCV15, PCV20)
+
+View(nepalForBarChart)
 ```
 
 ```{r}
@@ -97,8 +95,12 @@ ggplot(nepalForBarChart, aes(x = PCV20, fill = In_silico_serotype)) +
 
 ```         
 # Identifying the unique serotypes in the dataset
-unique(nepal2Df$In_silico_serotype
+unique(nepal2Df$In_silico_serotype)
 ```
+
+-   
+
+-   
 
 ```{r}
 # Grouping all the pcv10 serotypes into the PCV10_group category
@@ -113,28 +115,36 @@ pcv7df <- data.frame(
   Vaccine = "PCV7",
   Response = nepalForBarChart$PCV7,
   PCV10_group = nepalForBarChart$PCV10_group,
-  Serotype = nepalForBarChart$In_silico_serotype)
+  Serotype = nepalForBarChart$In_silico_serotype
+)
 
 pcv13df <- data.frame(
   Vaccine = "PCV13",
   Response = nepalForBarChart$PCV13,
   PCV10_group = nepalForBarChart$PCV10_group,
-  Serotype = nepalForBarChart$In_silico_serotype)
+  Serotype = nepalForBarChart$In_silico_serotype
+)
 
 pcv15df <- data.frame(
   Vaccine = "PCV15",
   Response = nepalForBarChart$PCV15,
   PCV10_group = nepalForBarChart$PCV10_group,
-  Serotype = nepalForBarChart$In_silico_serotype)
+  Serotype = nepalForBarChart$In_silico_serotype
+)
 
 pcv20df <- data.frame(
   Vaccine = "PCV20",
   Response = nepalForBarChart$PCV20,
   PCV10_group = nepalForBarChart$PCV10_group,
-  Serotype = nepalForBarChart$In_silico_serotype)
+  Serotype = nepalForBarChart$In_silico_serotype
+)
 
 # Combining all four into one dataframe
 combined <- rbind(pcv7df, pcv13df, pcv15df, pcv20df)
+```
+
+```{r}
+
 ```
 
 ```{r}
@@ -193,6 +203,10 @@ nepalPivotedDf[, c("index", "Year", "period1", "period2")]
 ```
 
 ```{r}
+
+```
+
+```{r}
 # Filtering out the year 2014
 nepalPivotedDf <- nepalPivotedDf %>%
   filter(Year != 2014)
@@ -202,48 +216,29 @@ nepalPivotedDf$log.offset <- log(nepalPivotedDf$typhoidCount)
 ```
 
 ```{r}
-# Should year be here
 # Using the log.offset and index to predict the count of IPD infections
-nepalPivotedDf$Factored_Year = as.factor(nepalPivotedDf$Year)
-nepalPivotedDf$Factored_Year = droplevels(nepalPivotedDf$Factored_Year)
-table(nepalPivotedDf$Factored_Year)
-dim(nepalPivotedDf[nepalPivotedDf$Year == 2009,])
-dim(nepalPivotedDf[nepalPivotedDf$Year == 2011,])
-dim(nepalPivotedDf[nepalPivotedDf$Year == 2012,])
-dim(nepalPivotedDf[nepalPivotedDf$Year == 2013,])
-dim(nepalPivotedDf[nepalPivotedDf$Year == 2015,])
-dim(nepalPivotedDf[nepalPivotedDf$Year == 2016,])
-dim(nepalPivotedDf[nepalPivotedDf$Year == 2017,])
-dim(nepalPivotedDf[nepalPivotedDf$Year == 2018,])
+mod3 <- glm.nb(IPDCount ~ index  + offset(log.offset) +
+          # Finding the change in disease during administration and evaluation period
+          period1  + period2, data = nepalPivotedDf)
 
-factors = c(rep(0,7072),rep(1,770),rep(2,3456), rep(3,272),rep(4,1927),rep(5,3456),rep(6,45326),rep(7,105472))
-factors = as.factor(factors)
-nepalPivotedDf$factors = factors
-#mod3 <- glm.nb(as.numeric(IPDCount) ~ index + factors + offset(log.offset)+
-#          # Finding the change in disease during administration and evaluation period
-#          period1  + period2, data = nepalPivotedDf)
-
-#summary(mod3)
+summary(mod3)
 ```
 
 ```{r}
 # Plotting an infections scatterplot
 p1 <- 
   ggplot(nepalPivotedDf, aes(x = Year, y = IPDCount)) +
-      geom_point(color = "#00356B") +
-      labs(title = "Pneomoccocal Infections Scatter Plot",
+      geom_point() +
+      labs(title = "IPD Infections Scatter Plot",
          x = "Year", y = "Count") +
       theme_linedraw() +
       theme(panel.spacing = unit(2, 'lines'), 
             axis.text.x = element_text(angle = 90))
 
 p1
-
-# group
 ```
 
 ```{r}
-'''
 # Making predictions with confidence intervals
 pred4 <- predict(mod3, type = "response", se.fit = TRUE)
 
@@ -252,25 +247,24 @@ nepalPivotedDf.pred.its <- nepalPivotedDf %>%
   mutate(se.fit = pred4$se.fit, pred = pred4$fit) %>%
   mutate(
     conf.low = pred - 1.96 * se.fit,
-    conf.high = pred + 1.96 * se.fit)
+    conf.high = pred + 1.96 * se.fit
+  )
 
 # Plotting the newly created model fitting
 p4 <- p1 +
   # Adding the fitting line
   geom_line(data = nepalPivotedDf.pred.its, aes(x = Year, y = pred),
-            color = "#00356B") +
+            color = "#377eb8") +
   # Adding the confidence interval
   geom_ribbon(data = nepalPivotedDf.pred.its, aes(ymin = conf.low, ymax = conf.high), 
-              alpha = 0.2, fill = "#008080") +
+              alpha = 0.2, fill = "blue") +
   # Changeing the title name
   labs(title = "IPD Infections with a Negative Binomial Fit\nInterupted Time Series")
 
 p4
-'''
 ```
 
 ```{r}
-'''
 # Initializing the vacccine effect variables by setting them to 0
 nepalPivotedDf.counterfactual <- nepalPivotedDf
 nepalPivotedDf.counterfactual$period1 <- 0
@@ -284,12 +278,11 @@ nepalPivotedDf.pred.its$pred4.cf <- predict(mod3, type = "response",
 # Overlaying onto plot
 p4 +
  geom_line(data = nepalPivotedDf.pred.its, aes(x = Year, y = pred4.cf),
-           color='#E69F00', lty = 2)
-'''
+           color='#e41a1c', lty = 2)
+
 ```
 
 ```{r}
-'''
 # Generating the rate ratio between the fitted and counterfactual values
 nepalPivotedDf.pred.its$rr.its <- nepalPivotedDf.pred.its$pred/nepalPivotedDf.pred.its$pred4.cf
 
@@ -302,24 +295,20 @@ p6 <-
       theme_linedraw() +
       theme(panel.spacing = unit(2, 'lines'), 
             axis.text.x = element_text(angle = 90)) +
-      geom_hline(yintercept = 1, col = "#999999", lty = 2)
+      geom_hline(yintercept = 1, col = "gray", lty = 2)
 
 p6
-'''
 ```
 
 ```{r}
-'''
-# Should year be here
 # A slightly more complicated model where the slope of the line is also allowed to vary in the post vaccine period
-mod3a <- glm.nb(IPDCount~index + offset(log.offset) +
+mod3a <- glm.nb(IPDCount~index + Year + offset(log.offset) +
                  # Adding the counterfactuals with an interaction term.
                  period1 + period1*index +
                  period2 + period2*index, data=nepalPivotedDf)
 
-summary(mod3a)
+summary( mod3a)
 AIC(mod3, mod3a)
-'''
 ```
 
 # Time Series Method 2
@@ -339,7 +328,6 @@ nepalPivotedDf[c("Year", "index", "spl1", "spl2")]
 ```
 
 ```{r}
-# Should year be here
 mod4 <- glm.nb(IPDCount ~ index + Year + offset(log.offset) +
                  # Post-vaccine changes.
                  spl1 + spl2, data = nepalPivotedDf)
@@ -372,21 +360,23 @@ nepalPivotedDf.pred.spl <- nepalPivotedDf.pred.spl %>%
   mutate(se.fit = pred7$se.fit, pred = pred7$fit) %>%
   mutate(
     conf.low = pred - 1.96 * se.fit,
-    conf.high = pred + 1.96 * se.fit)
+    conf.high = pred + 1.96 * se.fit
+  )
+
 
 p7 <- 
   ggplot(nepalPivotedDf.pred.spl, aes(x = Year, y = IPDCount)) +
       geom_point() +
       # Add the fitted line.
       geom_line(data = nepalPivotedDf.pred.spl, aes(x = Year, y = pred.spl),
-                color = "#00356B") +
+                color = "#377eb8") +
       # Add the confidence interval.
       geom_ribbon(data = nepalPivotedDf.pred.spl, aes(ymin = conf.low, ymax = conf.high),
-                  alpha = 0.2, fill = "#008080") +
+                  alpha = 0.2, fill = "blue") +
       # Add the counterfactual line.
       geom_line(data = nepalPivotedDf.pred.spl, aes(x = Year, y = pred.spl.cf),
-                color = "#E69F00", lty = 2) +
-      labs(title = "IPD Infections with a Negative Binomial Fit\nITS with Spline Smoothing",
+                color = "#e41a1c", lty = 2) +
+      labs(title = "Deaths with a Negative Binomial Fit\nITS with Spline Smoothing",
          x = "Year", y = "Counts") +
       theme_linedraw() +
       # Specify aspects of the theme plot formatting settings.
@@ -402,7 +392,7 @@ nepalPivotedDf.pred.spl$rr.spline <- nepalPivotedDf.pred.spl$pred.spl/nepalPivot
 
 p8 <- p6 +
      geom_line(data = nepalPivotedDf.pred.spl, aes(x = Year, y = rr.spline),
-               color = "#E69F00", lty = 2)
+               color = "red", lty = 2)
 
 p8
 ```
@@ -412,6 +402,10 @@ Now doing method one and two but with combined carriage data
 ```{r}
 nepalNonGps <- read.csv("nepal.csv")
 nepalNonGps
+```
+
+```{r}
+
 ```
 
 ```{r}
@@ -434,22 +428,38 @@ nepalNonGpsCarriage
 ```{r}
 # Plotting the counts of carriage infections over time for non gps dataset
 ggplot(data = nepalNonGpsCarriage, aes(x = as.numeric(Year), y = Count)) +
-  geom_line(color = "#00356B") +
+  geom_line() +
   theme_bw() +
   labs(x = "Year", y = "Count", title = "Pneumococcal Carriage Infection Counts Over Time")
 ```
 
 ```{r}
-nepalGroupedCarriage <- nepal2Df %>%
-  filter(Clinical_manifestation == "CARRIAGE") %>%
+# Selecting only carriage cases from nepal gps dataset
+nepalCarriage <- nepal2Df %>%
   group_by(Year) %>%
-  dplyr::summarize(IPDCount = n())
+  mutate(IPDCount = n()) %>%
+  filter(Clinical_manifestation == "CARRIAGE") %>%
+  dplyr::select(Year, IPDCount)
+    
+nepalGroupedCarriage <- nepalCarriage %>% 
+   group_by(Year, IPDCount) %>%
+   summarize(.groups = 'drop')
+
+nepalGroupedCarriage
+```
+
+```{r}
+View(nepalNonGpsCarriage)
+View(nepalGroupedCarriage)
 ```
 
 ```{r}
 # Combining the two datasets
 mergedCarriageDf <- merge(nepalNonGpsCarriage, nepalGroupedCarriage, by = "Year", all = TRUE)
 mergedCarriageDf
+```
+
+```{r}
 ```
 
 ```{r}
@@ -479,26 +489,18 @@ carriage2[, c("index", "Year", "period1", "period2")]
 ```
 
 ```{r}
-t2 <- typhoidDf %>%
+typhoidDf_grouped <- typhoidDf %>%
   group_by(Year) %>%
-  dplyr::summarize(typhoidCount = n())
+  mutate(typhoidCount = n()) %>%
+  dplyr::select(Year, typhoidCount)
 
-#t2 <- typhoidDf_grouped %>%
-#   group_by(Year, typhoidCount) %>%
-#  summarize(.groups = 'drop')
-
-#nepalGroupedCarriage <- nepal2Df %>%
-#  filter(Clinical_manifestation == "CARRIAGE") %>%
-#  group_by(Year) %>%
-#  dplyr::summarize(IPDCount = n())
+t2 <- typhoidDf_grouped %>%
+   group_by(Year, typhoidCount) %>%
+   summarize(.groups = 'drop')
 
 # Adding the typhoid counts to the carriage2 dataset
 mergedCarriage2DF <- merge(carriage2, t2, by = "Year")
 ```
-
-NOW ALL THREE METHODS WITH ONLY CARRIAGE DATA
-
-Method One
 
 ```{r}
 # Creating the offsets by selecting all tyhpoid cases
@@ -506,15 +508,11 @@ mergedCarriage2DF$log.offset <- log(mergedCarriage2DF$typhoidCount)
 ```
 
 ```{r}
-# Making year into a factored variable
-mergedCarriage2DF$Int_Year = as.integer(mergedCarriage2DF$Year)
-
-mergedCarriage2DF <- mergedCarriage2DF %>%
-  filter(Year != 2014)
-
-mod3 <- glm.nb(CCount ~ index  + Int_Year + offset(log.offset) +
+#mergedCarriage2DF <- mergedCarriage2DF %>%
+#  filter(Year != 2014)
+mod3 <- glm.nb(CCount ~ index  + offset(log.offset) +
           # Finding the change in disease during administration and evaluation period
-          period1  + period2, data = mergedCarriage2DF, control = glm.control(maxit = 100, epsilon = 1e-08))
+          period1  + period2, data = mergedCarriage2DF)
 
 summary(mod3)
 ```
@@ -522,7 +520,7 @@ summary(mod3)
 ```{r}
 p1 <- 
   ggplot(mergedCarriage2DF, aes(x = Year, y = CCount)) +
-      geom_point(color = "#6A0DAD") +
+      geom_point() +
       labs(title = "Carriage Infections Scatter Plot",
          x = "Year", y = "Counts") +
       # Have y-axis for the two plots be the same.
@@ -530,13 +528,9 @@ p1 <-
       theme_linedraw() +
       # Specify aspects of the theme plot formatting settings.
       theme(panel.spacing = unit(2, 'lines'), 
-            axis.text.x = element_text(angle = 0, size = 12),
-            axis.text.y = element_text(size = 12),
-            axis.title = element_text(size = 14),
-            title = element_text(size = 18))
+            axis.text.x = element_text(angle = 90))
 
 p1
-
 ```
 
 ```{r}
@@ -555,16 +549,19 @@ mergedCarriage2DF.pred.its <- mergedCarriage2DF %>%
 p4 <- p1 +
   # Add the fitting line.
   geom_line(data = mergedCarriage2DF.pred.its, aes(x = Year, y = pred), group = 1,
-            color = "#00356B") +
+            color = "#377eb8") +
   # Add the confidence interval.
-  geom_ribbon(data = mergedCarriage2DF.pred.its, aes( ymin = conf.low, ymax = conf.high), group = 1, alpha = 0.2, fill = "#008080") +
+  geom_ribbon(data = mergedCarriage2DF.pred.its, aes(ymin = conf.low, ymax = conf.high), group = 1, 
+              alpha = 0.2, fill = "blue") +
   # Change the title name.
-  labs(title = "Pneumococcal Carriage Infections in Nepal",
-       subtitle = "Interrupted Time Series, Negative Binomial Fit")
+  labs(title = "Infections with a Negative Binomial Fit\nInterupted Time Series")
+
 p4
 ```
 
 ```{r}
+
+
 # Initialize the vacccine effect variables by setting them to 0.
 mergedCarriage2DF.counterfactual <- mergedCarriage2DF
 mergedCarriage2DF.counterfactual$period1 <- 0
@@ -575,15 +572,10 @@ mergedCarriage2DF.pred.its$pred4.cf <- predict(mod3, type = "response",
   # Extract fitted value and add to df.pred.
   newdata = mergedCarriage2DF.counterfactual)
 
-#colors <- c("Negative Binomial Fit" = "#00356B", "Confidence Interval" = "#008080"###,"Counterfactual" = "#E69F00")
-
 # Overlay onto plot.
 p4 +
-  geom_line(data = mergedCarriage2DF.pred.its, aes(x = Year, y = pred4.cf),
-           color='#E69F00', lty = 2, group = 1)
-#  scale_color_manual(name = "Group",
-#                     values = c("Negative Binomial Fitted Line" = "#00356B", "Confidence #Interval" = "#008080","Counterfactual" = "#E69F00"),
-#                     labels = c("Negative Binomial Fitted Line", "Confidence Interval", #"Counterfactual"))
+ geom_line(data = mergedCarriage2DF.pred.its, aes(x = Year, y = pred4.cf),
+           color='#e41a1c', lty = 2, group = 1)
 ```
 
 ```{r}
@@ -593,16 +585,15 @@ mergedCarriage2DF.pred.its$rr.its <- mergedCarriage2DF.pred.its$pred/mergedCarri
 p6 <- 
   ggplot(mergedCarriage2DF.pred.its, aes(x = Year, y = rr.its)) +
       geom_line(group = 1) +
-      labs(title = "Rate Ratio Between Model and Counterfactual",
+      labs(title = "Rate Ratio for the ITS Mode",
          x = "Year", y = "Rate ratio") +
       theme_linedraw() +
       # Specify aspects of the theme plot formatting settings.
       theme(panel.spacing = unit(2, 'lines'), 
             axis.text.x = element_text(angle = 90)) +
-      geom_hline(yintercept = 1, col = "#999999", lty = 2)
+      geom_hline(yintercept = 1, col = "gray", lty = 2)
 
 p6
-# look up rate ratio comparison
 ```
 
 ```{r}
@@ -651,6 +642,10 @@ method3Carriage[c("Year", "index", "spl1", "spl2")]
 ```
 
 ```{r}
+
+```
+
+```{r}
 method3Carriage <- method3Carriage %>%
   filter(Year != 2014)
 mod4 <- glm.nb(CCount ~ index3  + offset(log.offset) +
@@ -677,6 +672,8 @@ method3Carriage.pred.spl$pred.spl.cf <- predict(mod4, type = "response",
 ```
 
 ```{r}
+
+
 # Make predictions with confidence intervals.
 pred7 <- predict(mod4, type = "response", se.fit = TRUE)
 
@@ -694,14 +691,14 @@ p7 <-
       geom_point() +
       # Add the fitted line.
       geom_line(data = method3Carriage.pred.spl, aes(x = Year, y = pred.spl),
-                color = "#00356B", group = 1) +
+                color = "#377eb8", group = 1) +
       # Add the confidence interval.
       geom_ribbon(data = method3Carriage.pred.spl, aes(ymin = conf.low, ymax = conf.high),
-                  alpha = 0.2, fill = "#008080", group = 1) +
+                  alpha = 0.2, fill = "blue", group = 1) +
       # Add the counterfactual line.
       geom_line(data = method3Carriage.pred.spl, aes(x = Year, y = pred.spl.cf),
-                color = "#E69F00", lty = 2, group = 1) +
-      labs(title = "Pneomoccocal Carriage Infections\nNegative Binomial Fit, Interrupted Time Series with Spline Smoothing",
+                color = "#e41a1c", lty = 2, group = 1) +
+      labs(title = "Carriage Infections with a Negative Binomial Fit\nITS with Spline Smoothing",
          x = "Year", y = "Counts") +
       theme_linedraw() +
       # Specify aspects of the theme plot formatting settings.
@@ -709,8 +706,6 @@ p7 <-
             axis.text.x = element_text(angle = 90))
 
 p7
-# use subtitle
-# angles years
 ```
 
 ```{r}
@@ -719,9 +714,7 @@ method3Carriage.pred.spl$rr.spline <- method3Carriage.pred.spl$pred.spl/method3C
 
 p8 <- p6 +
      geom_line(data = method3Carriage.pred.spl, aes(x = Year, y = rr.spline),
-               color = "#E69F00", lty = 2) + 
-      # Update the title.
-      labs(title = "Rate Ratio with the Spline Model")
+               color = "red", lty = 2)
 
 p8
 ```
@@ -731,46 +724,32 @@ typhoid dataset ends at 2019, so we left out 2021 from the nepal datasets
 Method three
 
 ```{r}
-# Setting the count variable to NA during the post vaccine period
-
-method3Carriage$CCountPre <- method3Carriage$CCount
+mergedCarriage2DF$CCount <- mergedCarriage2DF$CCount
 
 introYear <- year(vax.intro.date)
-method3Carriage$Year <- as.numeric(method3Carriage$Year)
+mergedCarriage2DF$Year <- as.numeric(mergedCarriage2DF$Year)
 
+mergedCarriage2DF$CCount[which(mergedCarriage2DF$Year >= vax.intro.date)] <- NA
 
-
-method3Carriage$CCountPre[which(method3Carriage$Year >= 2016)] <- NA
-
-method3Carriage[, c("Year", "CCountPre")]
+mergedCarriage2DF[, c("Year", "CCount")]
 ```
 
 ```{r}
-
-# Making index into an integer
-#method3Carriage$int_index <- as.numeric(method3Carriage$index)
-
-#pre_data <- method3Carriage %>% filter(!is.na(CCountPre))
-
-#mod5 <- glm.nb(CCountPre ~ int_index + offset(log.offset), data = pre_data)
-
-
-# Not adding year because no seasonality
-mod5<- glm.nb(CCountPre ~ index + offset(log.offset), data = method3Carriage)
+mod5<- glm.nb(CCount ~ index # Time trend
+              + Year # Seasonality
+              + offset(log.offset), data = mergedCarriage2DF)
 
 # Add the prediction using the smoothed model.
-method3Carriage.pred.pre <- method3Carriage %>%
-  mutate(pred.mod5 = predict(mod5, type = "response", newdata = method3Carriage))
+ds.pred.mod5 <- mergedCarriage2DF %>%
+  mutate(pred.mod5 = predict(mod5, type = "response", newdata = mergedCarriage2DF))
 ```
 
 ```{r}
-## Prepare a plot to visualize the factual model predictions
-
 # Make predictions with confidence intervals.
-pred7 <- predict(mod5, type = "response", se.fit = TRUE, newdata = method3Carriage)
+pred7 <- predict(mod4, type = "response", se.fit = TRUE)
 
 # Add the model predictions and 95% COI to the dataframe.
-method3Carriage.pred.pre <- method3Carriage.pred.pre %>%
+mergedCarriage2DF.pred.spl <- mergedCarriage2DF.pred.spl %>%
   mutate(se.fit = pred7$se.fit, pred = pred7$fit) %>%
   mutate(
     conf.low = pred - 1.96 * se.fit,
@@ -778,40 +757,54 @@ method3Carriage.pred.pre <- method3Carriage.pred.pre %>%
   )
 
 
-p_m3 <- 
-  ggplot(method3Carriage.pred.pre, aes(x = Year, y = CCount)) +
+p7 <- 
+  ggplot(mergedCarriage2DF.pred.spl, aes(x = Year, y = CCount)) +
       geom_point() +
       # Add the fitted line.
-      geom_line(data = method3Carriage.pred.pre, aes(x = Year, y = pred),
+      geom_line(data = mergedCarriage2DF.pred.spl, aes(x = Year, y = pred.spl),
                 color = "#377eb8") +
       # Add the confidence interval.
-      geom_ribbon(data = method3Carriage.pred.pre, aes(ymin = conf.low, ymax = conf.high),
+      geom_ribbon(data = mergedCarriage2DF.pred.spl, aes(ymin = conf.low, ymax = conf.high),
                   alpha = 0.2, fill = "blue") +
-      labs(title = "Deaths with a Negative Binomial Fit\nExtrapolating Based on the Pre-Vaccine Period",
-         x = "Date", y = "Counts for <5 yo") +
-      theme_linedraw()
+      # Add the counterfactual line.
+      geom_line(data = mergedCarriage2DF.pred.spl, aes(x = Year, y = pred.spl.cf),
+                color = "#e41a1c", lty = 2) +
+      labs(title = "Carriage Infections with a Negative Binomial Fit\nITS with Spline Smoothing",
+         x = "Year", y = "Counts") +
+      theme_linedraw() +
+      # Specify aspects of the theme plot formatting settings.
+      theme(panel.spacing = unit(2, 'lines'), 
+            axis.text.x = element_text(angle = 90))
 
-p_m3
+
+
+p9 <- ggplot(ds.pred.mod5, aes(x=Year, y=CCount)) +
+      geom_point() +
+      ylab("Carriage Counts, <1 yo") +
+      xlab("Year") +
+      theme_linedraw() +
+      theme(panel.spacing= unit(2,'lines') , axis.text.x=element_text(angle=90)) +
+      geom_hline(yintercept=0, col='gray', lty=2) +
+      geom_line(color='#377eb8', data=ds.pred.mod5, aes(x=Year, y=pred.mod5))
+p9
 ```
 
 ```{r}
-ds.pred.mod5$rr.trend<-method3Carriage$CCount/ds.pred.mod5$pred.mod5
+ds.pred.mod5$rr.trend<-mergedCarriage2DF$CCount/ds.pred.mod5$pred.mod5
+
 ```
 
 ```{r}
-# Change color here
-p8 +
-  geom_line(color='#377eb8',lwd=1, lty=1,data=ds.pred.mod5, aes(x=Year, y=rr.trend))
+p8 +  geom_line(color='#377eb8',lwd=1, lty=1,data=ds.pred.mod5, aes(x=Year, y=rr.trend, group = 1))
+
 ```
 
-Comparing the three methods
-
 ```{r}
-eval.period<-method3Carriage$Year> vax.eval.year
+eval.period<-mergedCarriage2DF$Year> vax.eval.date
 
 rr.its.eval<- mean(mergedCarriage2DF.pred.its$rr.its[eval.period])
 
-rr.spline.eval<- mean(method3Carriage.pred.spl$rr.spline[eval.period])
+rr.spline.eval<- mean(mergedCarriage2DF.pred.spl$rr.spline[eval.period])
 
 rr.trend.eval<- sum(ds.pred.mod5$CCount[eval.period])/sum(ds.pred.mod5$pred.mod5[eval.period])
 
@@ -820,5 +813,3 @@ round(c('ITS'=rr.its.eval,'Spline'=rr.spline.eval,'Trend Extrapolation'=rr.trend
 #Percent decline
 100*(1- round(c('ITS'=rr.its.eval,'Spline'=rr.spline.eval,'Trend Extrapolation'=rr.trend.eval ),2))
 ```
-
-One of the modeling methods identified a decrease of approximately 73% in pneumonia deaths due to pneumococcal disease after the release of the PCV10 vaccine and one identified a 99% decrease. The extrapolation method indicates a weaker vaccine effect; however, we expect some of this result to be spurious due to the level of random noise introduced by applying the observed values in the counterfactual ratio calculation.
