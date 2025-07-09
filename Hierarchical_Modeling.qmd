@@ -25,6 +25,7 @@ nepal <- read.csv("nepal.csv")
 nepal.gps <- read.csv("nepal_gps.csv")
 ```
 
+
 ```{r making carriage dfs from nepal_gps & nepal datasets}
 # make list of serotypes included in each vaccine
 pcv10_serotypes <- c('1', '4', '5', '6B', '7F', '9V', '14', '18C', '19F', '23F')
@@ -452,13 +453,13 @@ ggplot(carriage_serotype_proportions, aes(x = Year)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 carriage_serotype_proportions <- carriage_serotype_proportions %>%
-  mutate(Serotype = recode(Serotype,
-    "PCV10serotypes" = "PCV10 Serotypes",
-    "PCV13serotypes" = "Additional PCV13 (Non PCV10)",
-    "PCV15serotypes" = "Additional PCV15 (Non PCV13)",
-    "PCV20serotypes" = "Additional PCV20 (Non PCV15)"
-  ))
-
+  mutate(Serotype = factor(Serotype, levels = c(
+    "PCV10 Serotypes",
+    "Additional PCV13 (Non PCV10)",
+    "Additional PCV15 (Non PCV13)",
+    "Additional PCV20 (Non PCV15)",
+    "Other"
+  )))
 
 custom_colors <- c(
   "PCV10 Serotypes"    = "#00356B",
@@ -467,7 +468,6 @@ custom_colors <- c(
   "Additional PCV20 (Non PCV15)"    = "#E69F00",
   "Other"              = "#999999"
 )
-
 
 ggplot(carriage_serotype_proportions, aes(x = as.integer(Year), y = Percent, group = Serotype, color = Serotype)) +
   geom_point(alpha = 0.6) +
@@ -478,7 +478,9 @@ ggplot(carriage_serotype_proportions, aes(x = as.integer(Year), y = Percent, gro
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
         axis.title = element_text(size=15),
         axis.text = element_text(size=13),
-        plot.title = element_text(size=15, face="bold"))
+        plot.title = element_text(size=15, face="bold"),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 10, face = "bold"))
 ```
 
 
@@ -880,20 +882,41 @@ ggplot(disease_serotype_proportions, aes(x = Year)) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+disease_serotype_proportions <- disease_serotype_proportions %>%
+  mutate(Serotype = factor(recode(Serotype,
+    "PCV10serotypes" = "PCV10 Serotypes",
+    "PCV13serotypes" = "Additional PCV13 (Non PCV10)",
+    "PCV15serotypes" = "Additional PCV15 (Non PCV13)",
+    "PCV20serotypes" = "Additional PCV20 (Non PCV15)"
+  ),
+  levels = c(
+    "PCV10 Serotypes",
+    "Additional PCV13 (Non PCV10)",
+    "Additional PCV15 (Non PCV13)",
+    "Additional PCV20 (Non PCV15)",
+    "Other"
+  )))
+
 custom_colors <- c(
-  "PCV10serotypes" = "#00356B",   # Yale Blue
-  "PCV13serotypes" = "#6A0DAD",   # Purple
-  "PCV15serotypes" = "#008080",   # Teal
-  "PCV20serotypes" = "#E69F00",   # Gold
-  "Other" = "#999999"    # Grey fallback
+  "PCV10 Serotypes"    = "#00356B",
+  "Additional PCV13 (Non PCV10)"    = "#6A0DAD",
+  "Additional PCV15 (Non PCV13)"    = "#008080",
+  "Additional PCV20 (Non PCV15)"    = "#E69F00",
+  "Other"              = "#999999"
 )
+
+View(disease_serotype_proportions)
 
 ggplot(disease_serotype_proportions, aes(x = as.integer(Year), y = Percent, group = Serotype, color = Serotype)) +
   geom_point(alpha = 0.6) +
   geom_line(aes(y = expected_cases, group = Serotype)) +
   scale_color_manual(values = custom_colors) +
-  labs(y = "Percent of Cases", x = "Year", title = "Percent of Total Pneumococcal Disease Infections Per Year From Each Serotype Group", color = "Serotype Group") +
+  labs(y = "Percent of Cases Per Year", x = "Year", title = "Percent of Total Pneumococcal Disease Infections Per Year\nFrom Each Serotype Group", color = "Serotype Group") +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.title = element_text(size=15),
+        axis.text = element_text(size=13),
+        plot.title = element_text(size=15, face="bold"),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 10, face = "bold"))
 ```
-
