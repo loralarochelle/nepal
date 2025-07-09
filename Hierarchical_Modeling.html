@@ -1,0 +1,1601 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.6.42">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>hierarchical_modeling</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="Hierarchical_Modeling_files/libs/clipboard/clipboard.min.js"></script>
+<script src="Hierarchical_Modeling_files/libs/quarto-html/quarto.js"></script>
+<script src="Hierarchical_Modeling_files/libs/quarto-html/popper.min.js"></script>
+<script src="Hierarchical_Modeling_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="Hierarchical_Modeling_files/libs/quarto-html/anchor.min.js"></script>
+<link href="Hierarchical_Modeling_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="Hierarchical_Modeling_files/libs/quarto-html/quarto-syntax-highlighting-2f5df379a58b258e96c21c0638c20c03.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="Hierarchical_Modeling_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="Hierarchical_Modeling_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="Hierarchical_Modeling_files/libs/bootstrap/bootstrap-c0367b04c37547644fece4185067e4a7.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+
+
+
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(dplyr)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>
+Attaching package: 'dplyr'</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following objects are masked from 'package:stats':
+
+    filter, lag</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following objects are masked from 'package:base':
+
+    intersect, setdiff, setequal, union</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyr)</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(stringr)</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(reshape2)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>
+Attaching package: 'reshape2'</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following object is masked from 'package:tidyr':
+
+    smiths</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(lubridate)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>
+Attaching package: 'lubridate'</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following objects are masked from 'package:base':
+
+    date, intersect, setdiff, union</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(MASS)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>
+Attaching package: 'MASS'</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following object is masked from 'package:dplyr':
+
+    select</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(rjags)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Loading required package: coda</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Linked to JAGS 4.3.2</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Loaded modules: basemod,bugs</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(HDInterval)</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(sf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Linking to GEOS 3.13.0, GDAL 3.5.3, PROJ 9.5.1; sf_use_s2() is TRUE</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(areal)</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggthemes)</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(gridExtra)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>
+Attaching package: 'gridExtra'</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following object is masked from 'package:dplyr':
+
+    combine</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(RColorBrewer)</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(readr)</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(wesanderson)</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(viridis)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Loading required package: viridisLite</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggspatial)</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(janitor)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>
+Attaching package: 'janitor'</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>The following objects are masked from 'package:stats':
+
+    chisq.test, fisher.test</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(coda)</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>nepal <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">"nepal.csv"</span>)</span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>nepal.gps <span class="ot">&lt;-</span> <span class="fu">read.csv</span>(<span class="st">"nepal_gps.csv"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="co"># make list of serotypes included in each vaccine</span></span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>pcv10_serotypes <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">'1'</span>, <span class="st">'4'</span>, <span class="st">'5'</span>, <span class="st">'6B'</span>, <span class="st">'7F'</span>, <span class="st">'9V'</span>, <span class="st">'14'</span>, <span class="st">'18C'</span>, <span class="st">'19F'</span>, <span class="st">'23F'</span>)</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>pcv13_serotypes <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">'3'</span>, <span class="st">'6A'</span>, <span class="st">'19A'</span>)</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>pcv15_serotypes <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">'22F'</span>, <span class="st">'33F'</span>)</span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>pcv20_serotypes <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">'8'</span>, <span class="st">'10A'</span>, <span class="st">'11A'</span>, <span class="st">'12F'</span>, <span class="st">'15B'</span>)</span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>all_pcv_serotypes <span class="ot">&lt;-</span> <span class="fu">c</span>(pcv10_serotypes, pcv13_serotypes, pcv15_serotypes, pcv20_serotypes)</span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a><span class="co"># putting carriage samples from gps dataset into non-gps dataset form</span></span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>nepal.gps.carriage <span class="ot">&lt;-</span> nepal.gps <span class="sc">%&gt;%</span></span>
+<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a>  <span class="co"># take only carriage data from 2009 on</span></span>
+<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(Clinical_manifestation <span class="sc">==</span> <span class="st">"CARRIAGE"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(Year <span class="sc">&gt;=</span> <span class="dv">2009</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb29-13"><a href="#cb29-13" aria-hidden="true" tabindex="-1"></a>  <span class="co"># filter out irrelevant serotypes</span></span>
+<span id="cb29-14"><a href="#cb29-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span>(In_silico_serotype <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"COVERAGE TOO LOW"</span>, <span class="st">"UNTYPABLE"</span>, <span class="st">"SWISS_NT"</span>, <span class="st">"ALTERNATIVE_ALIB_NT"</span>))) <span class="sc">%&gt;%</span></span>
+<span id="cb29-15"><a href="#cb29-15" aria-hidden="true" tabindex="-1"></a>  <span class="co"># combine non-PCV serotypes into "other" category</span></span>
+<span id="cb29-16"><a href="#cb29-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">In_silico_serotype =</span> <span class="fu">if_else</span>(In_silico_serotype <span class="sc">%in%</span> all_pcv_serotypes, </span>
+<span id="cb29-17"><a href="#cb29-17" aria-hidden="true" tabindex="-1"></a>                                      In_silico_serotype, <span class="st">"Other"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb29-18"><a href="#cb29-18" aria-hidden="true" tabindex="-1"></a>  <span class="co"># group by year, serotype, and count</span></span>
+<span id="cb29-19"><a href="#cb29-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(Year, In_silico_serotype) <span class="sc">%&gt;%</span></span>
+<span id="cb29-20"><a href="#cb29-20" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">summarize</span>(<span class="at">count =</span> <span class="fu">n</span>(), <span class="at">.groups =</span> <span class="st">"drop"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb29-21"><a href="#cb29-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">Serotype =</span> In_silico_serotype) <span class="sc">%&gt;%</span></span>
+<span id="cb29-22"><a href="#cb29-22" aria-hidden="true" tabindex="-1"></a>  <span class="co"># pivot into same form as nepal dataset: years as cols, values as counts, all NAs are 0</span></span>
+<span id="cb29-23"><a href="#cb29-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_wider</span>(<span class="at">names_from =</span> Year, <span class="at">values_from =</span> count, <span class="at">values_fill =</span> <span class="dv">0</span>)</span>
+<span id="cb29-24"><a href="#cb29-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-25"><a href="#cb29-25" aria-hidden="true" tabindex="-1"></a><span class="co"># select only counts from the nepal dataset (not proportions), fix name to be just an int</span></span>
+<span id="cb29-26"><a href="#cb29-26" aria-hidden="true" tabindex="-1"></a>nepal_new <span class="ot">&lt;-</span> nepal <span class="sc">%&gt;%</span></span>
+<span id="cb29-27"><a href="#cb29-27" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(Serotype, X2014n, X2015n, X2017n, X2018n, X2019n, X2021n) <span class="sc">%&gt;%</span></span>
+<span id="cb29-28"><a href="#cb29-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename_with</span>(<span class="sc">~</span> <span class="fu">gsub</span>(<span class="st">"X|n"</span>, <span class="st">""</span>, .x), <span class="fu">starts_with</span>(<span class="st">"X"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb29-29"><a href="#cb29-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span>(Serotype <span class="sc">==</span> <span class="st">"PCV10serotypes"</span>))</span>
+<span id="cb29-30"><a href="#cb29-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-31"><a href="#cb29-31" aria-hidden="true" tabindex="-1"></a><span class="co"># join datasets together using full_join by serotype to get full carriage dataset</span></span>
+<span id="cb29-32"><a href="#cb29-32" aria-hidden="true" tabindex="-1"></a>nepal_carriage <span class="ot">&lt;-</span> <span class="fu">full_join</span>(nepal_new, nepal.gps.carriage, <span class="at">by =</span> <span class="st">"Serotype"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb29-33"><a href="#cb29-33" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="fu">across</span>(<span class="sc">-</span>Serotype, <span class="sc">~</span> <span class="fu">replace_na</span>(.x, <span class="dv">0</span>))) <span class="sc">%&gt;%</span></span>
+<span id="cb29-34"><a href="#cb29-34" aria-hidden="true" tabindex="-1"></a>  <span class="co"># get rid of Total row: it is no longer correct</span></span>
+<span id="cb29-35"><a href="#cb29-35" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(Serotype <span class="sc">!=</span> <span class="st">"Total"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb29-36"><a href="#cb29-36" aria-hidden="true" tabindex="-1"></a>  <span class="co"># get rid of .x and .y from years that only had data from one of the two datasets</span></span>
+<span id="cb29-37"><a href="#cb29-37" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="fu">across</span>(<span class="fu">ends_with</span>(<span class="st">".x"</span>), <span class="sc">~</span> <span class="fu">coalesce</span>(.x, <span class="fu">get</span>(<span class="fu">sub</span>(<span class="st">".x$"</span>, <span class="st">".y"</span>, <span class="fu">cur_column</span>()))),</span>
+<span id="cb29-38"><a href="#cb29-38" aria-hidden="true" tabindex="-1"></a>                <span class="at">.names =</span> <span class="st">"{sub('.x$', '', .col)}"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb29-39"><a href="#cb29-39" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span><span class="fu">matches</span>(<span class="st">"</span><span class="sc">\\</span><span class="st">.x$|</span><span class="sc">\\</span><span class="st">.y$"</span>))</span>
+<span id="cb29-40"><a href="#cb29-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-41"><a href="#cb29-41" aria-hidden="true" tabindex="-1"></a>carriage_serotype_year_counts <span class="ot">&lt;-</span> nepal_carriage <span class="sc">%&gt;%</span></span>
+<span id="cb29-42"><a href="#cb29-42" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_longer</span>(<span class="at">cols =</span> <span class="sc">-</span>Serotype, <span class="at">names_to =</span> <span class="st">"Year"</span>, <span class="at">values_to =</span> <span class="st">"cases"</span>)</span>
+<span id="cb29-43"><a href="#cb29-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-44"><a href="#cb29-44" aria-hidden="true" tabindex="-1"></a>df_sums <span class="ot">&lt;-</span> carriage_serotype_year_counts <span class="sc">%&gt;%</span></span>
+<span id="cb29-45"><a href="#cb29-45" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">group =</span> <span class="fu">case_when</span>(Serotype <span class="sc">%in%</span> pcv10_serotypes <span class="sc">~</span> <span class="st">"PCV10serotypes"</span>,</span>
+<span id="cb29-46"><a href="#cb29-46" aria-hidden="true" tabindex="-1"></a>                           Serotype <span class="sc">%in%</span> pcv13_serotypes <span class="sc">~</span> <span class="st">"PCV13serotypes"</span>,</span>
+<span id="cb29-47"><a href="#cb29-47" aria-hidden="true" tabindex="-1"></a>                           Serotype <span class="sc">%in%</span> pcv15_serotypes <span class="sc">~</span> <span class="st">"PCV15serotypes"</span>,</span>
+<span id="cb29-48"><a href="#cb29-48" aria-hidden="true" tabindex="-1"></a>                           Serotype <span class="sc">%in%</span> pcv20_serotypes <span class="sc">~</span> <span class="st">"PCV20serotypes"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb29-49"><a href="#cb29-49" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(group)) <span class="sc">%&gt;%</span></span>
+<span id="cb29-50"><a href="#cb29-50" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(<span class="at">Serotype =</span> group, Year) <span class="sc">%&gt;%</span></span>
+<span id="cb29-51"><a href="#cb29-51" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">cases =</span> <span class="fu">sum</span>(cases), <span class="at">.groups =</span> <span class="st">"drop"</span>)</span>
+<span id="cb29-52"><a href="#cb29-52" aria-hidden="true" tabindex="-1"></a>carriage_groups_df <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(carriage_serotype_year_counts, df_sums)</span>
+<span id="cb29-53"><a href="#cb29-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-54"><a href="#cb29-54" aria-hidden="true" tabindex="-1"></a>carriage_groups <span class="ot">&lt;-</span> carriage_groups_df <span class="sc">%&gt;%</span></span>
+<span id="cb29-55"><a href="#cb29-55" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(Serotype <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"Other"</span>, <span class="st">"PCV10serotypes"</span>, <span class="st">"PCV13serotypes"</span>, <span class="st">"PCV15serotypes"</span>, <span class="st">"PCV20serotypes"</span>))</span>
+<span id="cb29-56"><a href="#cb29-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-57"><a href="#cb29-57" aria-hidden="true" tabindex="-1"></a><span class="do">#### GETTING JUST DISEASE DATA FROM GPS DATASET ####</span></span>
+<span id="cb29-58"><a href="#cb29-58" aria-hidden="true" tabindex="-1"></a>nepal_disease <span class="ot">&lt;-</span> nepal.gps <span class="sc">%&gt;%</span></span>
+<span id="cb29-59"><a href="#cb29-59" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(Clinical_manifestation <span class="sc">!=</span> <span class="st">"CARRIAGE"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb29-60"><a href="#cb29-60" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">Clinical_manifestation =</span> <span class="st">"DISEASE"</span>) <span class="sc">%&gt;%</span> <span class="co"># </span></span>
+<span id="cb29-61"><a href="#cb29-61" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(Year <span class="sc">&gt;=</span> <span class="dv">2009</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb29-62"><a href="#cb29-62" aria-hidden="true" tabindex="-1"></a>  <span class="co"># filter out irrelevant serotypes</span></span>
+<span id="cb29-63"><a href="#cb29-63" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span>(In_silico_serotype <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"COVERAGE TOO LOW"</span>, <span class="st">"UNTYPABLE"</span>, <span class="st">"SWISS_NT"</span>, <span class="st">"ALTERNATIVE_ALIB_NT"</span>))) <span class="sc">%&gt;%</span></span>
+<span id="cb29-64"><a href="#cb29-64" aria-hidden="true" tabindex="-1"></a>  <span class="co"># combine non-PCV serotypes into "other" category</span></span>
+<span id="cb29-65"><a href="#cb29-65" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">In_silico_serotype =</span> <span class="fu">if_else</span>(In_silico_serotype <span class="sc">%in%</span> all_pcv_serotypes, </span>
+<span id="cb29-66"><a href="#cb29-66" aria-hidden="true" tabindex="-1"></a>                                      In_silico_serotype, <span class="st">"Other"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb29-67"><a href="#cb29-67" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">Serotype =</span> In_silico_serotype) <span class="sc">%&gt;%</span></span>
+<span id="cb29-68"><a href="#cb29-68" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(Year, Serotype) <span class="sc">%&gt;%</span></span>
+<span id="cb29-69"><a href="#cb29-69" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">summarize</span>(<span class="at">count =</span> <span class="fu">n</span>(), <span class="at">.groups =</span> <span class="st">"drop"</span>)</span>
+<span id="cb29-70"><a href="#cb29-70" aria-hidden="true" tabindex="-1"></a>disease_serotype_year_counts <span class="ot">&lt;-</span> nepal_disease</span>
+<span id="cb29-71"><a href="#cb29-71" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-72"><a href="#cb29-72" aria-hidden="true" tabindex="-1"></a><span class="fu">colnames</span>(disease_serotype_year_counts)[<span class="fu">colnames</span>(disease_serotype_year_counts) <span class="sc">==</span> <span class="st">"count"</span>] <span class="ot">&lt;-</span> <span class="st">"cases"</span></span>
+<span id="cb29-73"><a href="#cb29-73" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-74"><a href="#cb29-74" aria-hidden="true" tabindex="-1"></a>disease_serotype_year_counts <span class="ot">&lt;-</span> disease_serotype_year_counts <span class="sc">%&gt;%</span> </span>
+<span id="cb29-75"><a href="#cb29-75" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(Year <span class="sc">&gt;=</span> <span class="dv">2009</span> <span class="sc">&amp;</span> Year <span class="sc">!=</span> <span class="dv">2014</span> <span class="sc">&amp;</span> Year <span class="sc">!=</span> <span class="dv">2021</span>)</span>
+<span id="cb29-76"><a href="#cb29-76" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-77"><a href="#cb29-77" aria-hidden="true" tabindex="-1"></a><span class="co"># getting sums of counts for PCV13, PCV15, and PCV20 serotypes as rows as well </span></span>
+<span id="cb29-78"><a href="#cb29-78" aria-hidden="true" tabindex="-1"></a>df_sums <span class="ot">&lt;-</span> disease_serotype_year_counts <span class="sc">%&gt;%</span></span>
+<span id="cb29-79"><a href="#cb29-79" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">group =</span> <span class="fu">case_when</span>(Serotype <span class="sc">%in%</span> pcv10_serotypes <span class="sc">~</span> <span class="st">"PCV10serotypes"</span>,</span>
+<span id="cb29-80"><a href="#cb29-80" aria-hidden="true" tabindex="-1"></a>                           Serotype <span class="sc">%in%</span> pcv13_serotypes <span class="sc">~</span> <span class="st">"PCV13serotypes"</span>,</span>
+<span id="cb29-81"><a href="#cb29-81" aria-hidden="true" tabindex="-1"></a>                           Serotype <span class="sc">%in%</span> pcv15_serotypes <span class="sc">~</span> <span class="st">"PCV15serotypes"</span>,</span>
+<span id="cb29-82"><a href="#cb29-82" aria-hidden="true" tabindex="-1"></a>                           Serotype <span class="sc">%in%</span> pcv20_serotypes <span class="sc">~</span> <span class="st">"PCV20serotypes"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb29-83"><a href="#cb29-83" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(group)) <span class="sc">%&gt;%</span></span>
+<span id="cb29-84"><a href="#cb29-84" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(<span class="at">Serotype =</span> group, Year) <span class="sc">%&gt;%</span></span>
+<span id="cb29-85"><a href="#cb29-85" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">cases =</span> <span class="fu">sum</span>(cases), <span class="at">.groups =</span> <span class="st">"drop"</span>)</span>
+<span id="cb29-86"><a href="#cb29-86" aria-hidden="true" tabindex="-1"></a>disease_serotype_year_counts <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(disease_serotype_year_counts, df_sums)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Assign numeric IDs for JAGS</span></span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>carriage_serotype_year_counts <span class="ot">&lt;-</span> carriage_serotype_year_counts <span class="sc">%&gt;%</span></span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">sero_id =</span> <span class="fu">as.integer</span>(<span class="fu">factor</span>(Serotype)), <span class="co"># assigning IDs for serotypes</span></span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>         <span class="at">year_id =</span> <span class="fu">as.integer</span>(<span class="fu">factor</span>(Year))) <span class="co"># assigning IDs for the year</span></span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Create JAGS data list</span></span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>jdat <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">N =</span> <span class="fu">nrow</span>(carriage_serotype_year_counts), <span class="co"># number of rows = number of cases</span></span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">cases =</span> carriage_serotype_year_counts<span class="sc">$</span>cases, <span class="co"># cases = cases</span></span>
+<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">sero_id =</span> carriage_serotype_year_counts<span class="sc">$</span>sero_id, <span class="co"># serotype IDs</span></span>
+<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">year_id =</span> carriage_serotype_year_counts<span class="sc">$</span>year_id, <span class="co"># year IDs</span></span>
+<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a>  <span class="at">n_sero =</span> <span class="fu">length</span>(<span class="fu">unique</span>(carriage_serotype_year_counts<span class="sc">$</span>sero_id)), <span class="co"># number of unique serotypes</span></span>
+<span id="cb30-13"><a href="#cb30-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">n_year =</span> <span class="fu">length</span>(<span class="fu">unique</span>(carriage_serotype_year_counts<span class="sc">$</span>year_id)) <span class="co"># number of years</span></span>
+<span id="cb30-14"><a href="#cb30-14" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb30-15"><a href="#cb30-15" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="st">"Model2.R"</span>)</span>
+<span id="cb30-16"><a href="#cb30-16" aria-hidden="true" tabindex="-1"></a>model_path <span class="ot">&lt;-</span> <span class="st">"Model2.R"</span></span>
+<span id="cb30-17"><a href="#cb30-17" aria-hidden="true" tabindex="-1"></a><span class="co"># creates jags model based on the textConnection to the jcode file (Model2), using jdat</span></span>
+<span id="cb30-18"><a href="#cb30-18" aria-hidden="true" tabindex="-1"></a>mod <span class="ot">&lt;-</span> <span class="fu">jags.model</span>(<span class="fu">textConnection</span>(jcode), <span class="at">data =</span> jdat, <span class="at">n.chains =</span> <span class="dv">2</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Compiling model graph
+   Resolving undeclared variables
+   Allocating nodes
+Graph information:
+   Observed stochastic nodes: 168
+   Unobserved stochastic nodes: 42
+   Total graph size: 1067
+
+Initializing model</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="fu">update</span>(mod, <span class="dv">1000</span>)  <span class="co"># burn-in</span></span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a><span class="co"># generates posterior samples based on mu and beta, iterates 5000 times</span></span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>samp <span class="ot">&lt;-</span> <span class="fu">coda.samples</span>(mod, <span class="at">variable.names =</span> <span class="fu">c</span>(<span class="st">"mu"</span>, <span class="st">"beta"</span>), <span class="at">n.iter =</span> <span class="dv">5000</span>) </span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a><span class="co"># summarizes samples: gives quantile for each variable</span></span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(samp)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Iterations = 2001:7000
+Thinning interval = 1 
+Number of chains = 2 
+Sample size per chain = 5000 
+
+1. Empirical mean and standard deviation for each variable,
+   plus standard error of the mean:
+
+              Mean      SD  Naive SE Time-series SE
+beta[1]  -0.128088 0.09934 0.0009934      0.0013688
+beta[2]   0.117479 0.04138 0.0004138      0.0005794
+beta[3]   0.081968 0.03330 0.0003330      0.0004250
+beta[4]   0.131306 0.12727 0.0012727      0.0018043
+beta[5]  -0.043637 0.03523 0.0003523      0.0004518
+beta[6]   0.099068 0.02936 0.0002936      0.0003765
+beta[7]  -0.083074 0.05466 0.0005466      0.0007098
+beta[8]   0.247331 0.03660 0.0003660      0.0006081
+beta[9]  -0.108277 0.03417 0.0003417      0.0004804
+beta[10]  0.152344 0.07072 0.0007072      0.0010090
+beta[11] -0.044065 0.03141 0.0003141      0.0004132
+beta[12]  0.114018 0.04676 0.0004676      0.0006208
+beta[13] -2.000805 0.81868 0.0081868      0.0867988
+beta[14] -0.091859 0.07882 0.0007882      0.0010659
+beta[15] -0.036246 0.10103 0.0010103      0.0012525
+beta[16]  0.072497 0.02644 0.0002644      0.0003411
+beta[17] -0.084488 0.03454 0.0003454      0.0004479
+beta[18]  0.005019 0.09635 0.0009635      0.0012386
+beta[19]  0.086176 0.07656 0.0007656      0.0010037
+beta[20] -0.004670 0.05880 0.0005880      0.0007394
+beta[21]  0.165670 0.01077 0.0001077      0.0001559
+mu[1]     0.871937 0.23206 0.0023206      0.0033885
+mu[2]     2.654935 0.09540 0.0009540      0.0012848
+mu[3]     3.071326 0.07734 0.0007734      0.0010111
+mu[4]     0.357322 0.30335 0.0030335      0.0045928
+mu[5]     2.932161 0.08231 0.0008231      0.0010465
+mu[6]     3.306322 0.06764 0.0006764      0.0009269
+mu[7]     2.078844 0.12419 0.0012419      0.0016501
+mu[8]     2.952455 0.08757 0.0008757      0.0014507
+mu[9]     3.043791 0.07902 0.0007902      0.0010703
+mu[10]    1.548485 0.16689 0.0016689      0.0024281
+mu[11]    3.173020 0.07221 0.0007221      0.0010059
+mu[12]    2.376821 0.10848 0.0010848      0.0014974
+mu[13]   -5.698037 2.74412 0.0274412      0.3043917
+mu[14]    1.333292 0.18307 0.0018307      0.0025546
+mu[15]    0.804252 0.23709 0.0023709      0.0030979
+mu[16]    3.518560 0.06137 0.0006137      0.0007917
+mu[17]    3.000017 0.07971 0.0007971      0.0010210
+mu[18]    0.908498 0.22419 0.0022419      0.0028561
+mu[19]    1.401430 0.17607 0.0017607      0.0023049
+mu[20]    1.926472 0.13648 0.0013648      0.0017285
+mu[21]    5.297410 0.02510 0.0002510      0.0003489
+
+2. Quantiles for each variable:
+
+              2.5%      25%       50%      75%    97.5%
+beta[1]   -0.32550 -0.19520 -0.126954 -0.06049  0.06052
+beta[2]    0.03637  0.08914  0.117280  0.14573  0.19854
+beta[3]    0.01582  0.05939  0.082390  0.10428  0.14747
+beta[4]   -0.10991  0.04537  0.129618  0.21469  0.38628
+beta[5]   -0.11385 -0.06693 -0.043212 -0.01984  0.02427
+beta[6]    0.04311  0.07842  0.098706  0.11922  0.15635
+beta[7]   -0.19193 -0.12003 -0.082673 -0.04620  0.02341
+beta[8]    0.17695  0.22221  0.247059  0.27189  0.31929
+beta[9]   -0.17559 -0.13115 -0.108342 -0.08500 -0.04162
+beta[10]   0.01475  0.10473  0.151778  0.19914  0.29451
+beta[11]  -0.10625 -0.06514 -0.044443 -0.02259  0.01674
+beta[12]   0.02422  0.08211  0.114420  0.14558  0.20514
+beta[13]  -4.00421 -2.46656 -1.920519 -1.41572 -0.67383
+beta[14]  -0.24720 -0.14403 -0.090712 -0.03879  0.06095
+beta[15]  -0.23333 -0.10487 -0.036229  0.03149  0.16276
+beta[16]   0.02001  0.05494  0.072582  0.09026  0.12357
+beta[17]  -0.15248 -0.10777 -0.084290 -0.06157 -0.01736
+beta[18]  -0.18267 -0.06071  0.003811  0.07037  0.19158
+beta[19]  -0.06405  0.03530  0.086075  0.13615  0.23881
+beta[20]  -0.12090 -0.04403 -0.004292  0.03440  0.11190
+beta[21]   0.14463  0.15842  0.165481  0.17286  0.18763
+mu[1]      0.38599  0.71708  0.883625  1.03538  1.29468
+mu[2]      2.46047  2.59280  2.656607  2.71945  2.83812
+mu[3]      2.91605  3.01986  3.073348  3.12343  3.21815
+mu[4]     -0.28787  0.16775  0.375779  0.57171  0.89897
+mu[5]      2.76716  2.87777  2.933477  2.98895  3.08945
+mu[6]      3.17159  3.26173  3.306733  3.35268  3.43722
+mu[7]      1.82239  1.99686  2.081660  2.16430  2.31213
+mu[8]      2.77838  2.89378  2.953076  3.01287  3.12090
+mu[9]      2.88517  2.99154  3.044696  3.09698  3.19745
+mu[10]     1.20515  1.44257  1.555185  1.66103  1.85833
+mu[11]     3.03085  3.12382  3.174324  3.22201  3.31093
+mu[12]     2.15750  2.30399  2.379082  2.45234  2.58112
+mu[13]   -12.54996 -7.24088 -5.358778 -3.69878 -1.42615
+mu[14]     0.96768  1.21190  1.335382  1.45994  1.68077
+mu[15]     0.30599  0.65323  0.815521  0.96648  1.23913
+mu[16]     3.39508  3.47757  3.519934  3.56006  3.63499
+mu[17]     2.84040  2.94636  3.002010  3.05456  3.15401
+mu[18]     0.44799  0.76400  0.915995  1.06351  1.32554
+mu[19]     1.04134  1.28549  1.406297  1.52248  1.73355
+mu[20]     1.65170  1.83463  1.929446  2.01982  2.18518
+mu[21]     5.24739  5.28062  5.297592  5.31462  5.34570</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="fu">par</span>(<span class="at">mar =</span> <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">2</span>, <span class="dv">2</span>, <span class="dv">2</span>))  <span class="co"># smaller margins</span></span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a><span class="co"># plot(samp)</span></span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a><span class="co"># densplot(samp, main = "Posterior Density for Parameters")</span></span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>posterior_summary <span class="ot">&lt;-</span> <span class="fu">summary</span>(samp)</span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a><span class="co"># rounds estimates for each posterior value to 3 places</span></span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a><span class="fu">round</span>(posterior_summary<span class="sc">$</span>statistics, <span class="dv">3</span>)  <span class="co"># means, SDs</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>           Mean    SD Naive SE Time-series SE
+beta[1]  -0.128 0.099    0.001          0.001
+beta[2]   0.117 0.041    0.000          0.001
+beta[3]   0.082 0.033    0.000          0.000
+beta[4]   0.131 0.127    0.001          0.002
+beta[5]  -0.044 0.035    0.000          0.000
+beta[6]   0.099 0.029    0.000          0.000
+beta[7]  -0.083 0.055    0.001          0.001
+beta[8]   0.247 0.037    0.000          0.001
+beta[9]  -0.108 0.034    0.000          0.000
+beta[10]  0.152 0.071    0.001          0.001
+beta[11] -0.044 0.031    0.000          0.000
+beta[12]  0.114 0.047    0.000          0.001
+beta[13] -2.001 0.819    0.008          0.087
+beta[14] -0.092 0.079    0.001          0.001
+beta[15] -0.036 0.101    0.001          0.001
+beta[16]  0.072 0.026    0.000          0.000
+beta[17] -0.084 0.035    0.000          0.000
+beta[18]  0.005 0.096    0.001          0.001
+beta[19]  0.086 0.077    0.001          0.001
+beta[20] -0.005 0.059    0.001          0.001
+beta[21]  0.166 0.011    0.000          0.000
+mu[1]     0.872 0.232    0.002          0.003
+mu[2]     2.655 0.095    0.001          0.001
+mu[3]     3.071 0.077    0.001          0.001
+mu[4]     0.357 0.303    0.003          0.005
+mu[5]     2.932 0.082    0.001          0.001
+mu[6]     3.306 0.068    0.001          0.001
+mu[7]     2.079 0.124    0.001          0.002
+mu[8]     2.952 0.088    0.001          0.001
+mu[9]     3.044 0.079    0.001          0.001
+mu[10]    1.548 0.167    0.002          0.002
+mu[11]    3.173 0.072    0.001          0.001
+mu[12]    2.377 0.108    0.001          0.001
+mu[13]   -5.698 2.744    0.027          0.304
+mu[14]    1.333 0.183    0.002          0.003
+mu[15]    0.804 0.237    0.002          0.003
+mu[16]    3.519 0.061    0.001          0.001
+mu[17]    3.000 0.080    0.001          0.001
+mu[18]    0.908 0.224    0.002          0.003
+mu[19]    1.401 0.176    0.002          0.002
+mu[20]    1.926 0.136    0.001          0.002
+mu[21]    5.297 0.025    0.000          0.000</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="fu">round</span>(posterior_summary<span class="sc">$</span>quantiles, <span class="dv">3</span>)   <span class="co"># 2.5%, 50%, 97.5%</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>            2.5%    25%    50%    75%  97.5%
+beta[1]   -0.325 -0.195 -0.127 -0.060  0.061
+beta[2]    0.036  0.089  0.117  0.146  0.199
+beta[3]    0.016  0.059  0.082  0.104  0.147
+beta[4]   -0.110  0.045  0.130  0.215  0.386
+beta[5]   -0.114 -0.067 -0.043 -0.020  0.024
+beta[6]    0.043  0.078  0.099  0.119  0.156
+beta[7]   -0.192 -0.120 -0.083 -0.046  0.023
+beta[8]    0.177  0.222  0.247  0.272  0.319
+beta[9]   -0.176 -0.131 -0.108 -0.085 -0.042
+beta[10]   0.015  0.105  0.152  0.199  0.295
+beta[11]  -0.106 -0.065 -0.044 -0.023  0.017
+beta[12]   0.024  0.082  0.114  0.146  0.205
+beta[13]  -4.004 -2.467 -1.921 -1.416 -0.674
+beta[14]  -0.247 -0.144 -0.091 -0.039  0.061
+beta[15]  -0.233 -0.105 -0.036  0.031  0.163
+beta[16]   0.020  0.055  0.073  0.090  0.124
+beta[17]  -0.152 -0.108 -0.084 -0.062 -0.017
+beta[18]  -0.183 -0.061  0.004  0.070  0.192
+beta[19]  -0.064  0.035  0.086  0.136  0.239
+beta[20]  -0.121 -0.044 -0.004  0.034  0.112
+beta[21]   0.145  0.158  0.165  0.173  0.188
+mu[1]      0.386  0.717  0.884  1.035  1.295
+mu[2]      2.460  2.593  2.657  2.719  2.838
+mu[3]      2.916  3.020  3.073  3.123  3.218
+mu[4]     -0.288  0.168  0.376  0.572  0.899
+mu[5]      2.767  2.878  2.933  2.989  3.089
+mu[6]      3.172  3.262  3.307  3.353  3.437
+mu[7]      1.822  1.997  2.082  2.164  2.312
+mu[8]      2.778  2.894  2.953  3.013  3.121
+mu[9]      2.885  2.992  3.045  3.097  3.197
+mu[10]     1.205  1.443  1.555  1.661  1.858
+mu[11]     3.031  3.124  3.174  3.222  3.311
+mu[12]     2.157  2.304  2.379  2.452  2.581
+mu[13]   -12.550 -7.241 -5.359 -3.699 -1.426
+mu[14]     0.968  1.212  1.335  1.460  1.681
+mu[15]     0.306  0.653  0.816  0.966  1.239
+mu[16]     3.395  3.478  3.520  3.560  3.635
+mu[17]     2.840  2.946  3.002  3.055  3.154
+mu[18]     0.448  0.764  0.916  1.064  1.326
+mu[19]     1.041  1.285  1.406  1.522  1.734
+mu[20]     1.652  1.835  1.929  2.020  2.185
+mu[21]     5.247  5.281  5.298  5.315  5.346</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="co"># creates matrix of all betas across all simulation runs</span></span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>beta_samples <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(samp)[, <span class="fu">grep</span>(<span class="st">"beta"</span>, <span class="fu">colnames</span>(<span class="fu">as.matrix</span>(samp)))]</span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a><span class="co"># gives mean of each beta across all simulation runs</span></span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>beta_means <span class="ot">&lt;-</span> <span class="fu">apply</span>(beta_samples, <span class="dv">2</span>, mean)</span>
+<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a><span class="co"># makes CI for each beta</span></span>
+<span id="cb38-6"><a href="#cb38-6" aria-hidden="true" tabindex="-1"></a>beta_ci <span class="ot">&lt;-</span> <span class="fu">apply</span>(beta_samples, <span class="dv">2</span>, quantile, <span class="at">probs =</span> <span class="fu">c</span>(<span class="fl">0.025</span>, <span class="fl">0.975</span>))</span>
+<span id="cb38-7"><a href="#cb38-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-8"><a href="#cb38-8" aria-hidden="true" tabindex="-1"></a><span class="co"># gives mean and CI</span></span>
+<span id="cb38-9"><a href="#cb38-9" aria-hidden="true" tabindex="-1"></a>df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb38-10"><a href="#cb38-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">param =</span> <span class="fu">colnames</span>(beta_samples),</span>
+<span id="cb38-11"><a href="#cb38-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">mean =</span> beta_means,</span>
+<span id="cb38-12"><a href="#cb38-12" aria-hidden="true" tabindex="-1"></a>  <span class="at">lower =</span> beta_ci[<span class="dv">1</span>, ],</span>
+<span id="cb38-13"><a href="#cb38-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">upper =</span> beta_ci[<span class="dv">2</span>, ]</span>
+<span id="cb38-14"><a href="#cb38-14" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb38-15"><a href="#cb38-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-16"><a href="#cb38-16" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(df, <span class="fu">aes</span>(<span class="at">x =</span> param, <span class="at">y =</span> mean)) <span class="sc">+</span></span>
+<span id="cb38-17"><a href="#cb38-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb38-18"><a href="#cb38-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_errorbar</span>(<span class="fu">aes</span>(<span class="at">ymin =</span> lower, <span class="at">ymax =</span> upper), <span class="at">width =</span> <span class="fl">0.2</span>) <span class="sc">+</span></span>
+<span id="cb38-19"><a href="#cb38-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_flip</span>() <span class="sc">+</span></span>
+<span id="cb38-20"><a href="#cb38-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Posterior Estimates for Beta"</span>, <span class="at">y =</span> <span class="st">"Effect Size"</span>, <span class="at">x =</span> <span class="st">""</span>) <span class="sc">+</span></span>
+<span id="cb38-21"><a href="#cb38-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Hierarchical_Modeling_files/figure-html/carriage%20model%20-%20individual%20serotypes-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="co">#heatmap</span></span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Your original year and serotype info</span></span>
+<span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a>year_seq <span class="ot">&lt;-</span> <span class="fu">sort</span>(<span class="fu">unique</span>(jdat<span class="sc">$</span>year_id))  <span class="co"># e.g., 2000:2006</span></span>
+<span id="cb39-4"><a href="#cb39-4" aria-hidden="true" tabindex="-1"></a>sero_seq <span class="ot">&lt;-</span> <span class="dv">1</span><span class="sc">:</span>jdat<span class="sc">$</span>n_sero</span>
+<span id="cb39-5"><a href="#cb39-5" aria-hidden="true" tabindex="-1"></a>mean_year <span class="ot">&lt;-</span> (<span class="fu">length</span>(year_seq) <span class="sc">+</span> <span class="dv">1</span>) <span class="sc">/</span> <span class="dv">2</span></span>
+<span id="cb39-6"><a href="#cb39-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-7"><a href="#cb39-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a dataframe of all serotype-year combinations</span></span>
+<span id="cb39-8"><a href="#cb39-8" aria-hidden="true" tabindex="-1"></a>pred_grid <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(</span>
+<span id="cb39-9"><a href="#cb39-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">sero =</span> sero_seq,</span>
+<span id="cb39-10"><a href="#cb39-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">year =</span> year_seq</span>
+<span id="cb39-11"><a href="#cb39-11" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb39-12"><a href="#cb39-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-13"><a href="#cb39-13" aria-hidden="true" tabindex="-1"></a>samp_mat <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(samp)</span>
+<span id="cb39-14"><a href="#cb39-14" aria-hidden="true" tabindex="-1"></a>mu_means <span class="ot">&lt;-</span> <span class="fu">colMeans</span>(samp_mat[, <span class="fu">grep</span>(<span class="st">"^mu</span><span class="sc">\\</span><span class="st">["</span>, <span class="fu">colnames</span>(samp_mat))])</span>
+<span id="cb39-15"><a href="#cb39-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-16"><a href="#cb39-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-17"><a href="#cb39-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Predict expected log incidence</span></span>
+<span id="cb39-18"><a href="#cb39-18" aria-hidden="true" tabindex="-1"></a>pred_grid<span class="sc">$</span>log_lambda <span class="ot">&lt;-</span> mu_means[pred_grid<span class="sc">$</span>sero] <span class="sc">+</span></span>
+<span id="cb39-19"><a href="#cb39-19" aria-hidden="true" tabindex="-1"></a>  beta_means[pred_grid<span class="sc">$</span>sero] <span class="sc">*</span> (pred_grid<span class="sc">$</span>year <span class="sc">-</span> mean_year)</span>
+<span id="cb39-20"><a href="#cb39-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-21"><a href="#cb39-21" aria-hidden="true" tabindex="-1"></a><span class="co"># Back-transform to incidence</span></span>
+<span id="cb39-22"><a href="#cb39-22" aria-hidden="true" tabindex="-1"></a>pred_grid<span class="sc">$</span>lambda <span class="ot">&lt;-</span> <span class="fu">exp</span>(pred_grid<span class="sc">$</span>log_lambda)</span>
+<span id="cb39-23"><a href="#cb39-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-24"><a href="#cb39-24" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(pred_grid, <span class="fu">aes</span>(<span class="at">x =</span> year, <span class="at">y =</span> <span class="fu">factor</span>(sero), <span class="at">fill =</span> lambda)) <span class="sc">+</span></span>
+<span id="cb39-25"><a href="#cb39-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_tile</span>(<span class="at">color =</span> <span class="st">"white"</span>) <span class="sc">+</span></span>
+<span id="cb39-26"><a href="#cb39-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_viridis_c</span>(<span class="at">name =</span> <span class="st">"Expected</span><span class="sc">\n</span><span class="st">Cases"</span>, <span class="at">option =</span> <span class="st">"C"</span>) <span class="sc">+</span></span>
+<span id="cb39-27"><a href="#cb39-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Year"</span>, <span class="at">y =</span> <span class="st">"Serotype"</span>, <span class="at">title =</span> <span class="st">"Expected Cases by Year and Serotype"</span>) <span class="sc">+</span></span>
+<span id="cb39-28"><a href="#cb39-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb39-29"><a href="#cb39-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text.y =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">8</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Hierarchical_Modeling_files/figure-html/carriage%20model%20-%20individual%20serotypes-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(carriage_serotype_year_counts, <span class="fu">aes</span>(<span class="at">x =</span> Year, <span class="at">y =</span> Serotype, <span class="at">fill =</span> cases)) <span class="sc">+</span></span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_tile</span>(<span class="at">color =</span> <span class="st">"white"</span>) <span class="sc">+</span></span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_viridis_c</span>(<span class="at">option =</span> <span class="st">"C"</span>, <span class="at">name =</span> <span class="st">"Cases"</span>) <span class="sc">+</span></span>
+<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"IPD Cases by Serotype and Year"</span>,</span>
+<span id="cb40-5"><a href="#cb40-5" aria-hidden="true" tabindex="-1"></a>       <span class="at">x =</span> <span class="st">"Year"</span>,</span>
+<span id="cb40-6"><a href="#cb40-6" aria-hidden="true" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">"Serotype"</span>) <span class="sc">+</span></span>
+<span id="cb40-7"><a href="#cb40-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb40-8"><a href="#cb40-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text.x =</span> <span class="fu">element_text</span>(<span class="at">angle =</span> <span class="dv">45</span>, <span class="at">hjust =</span> <span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Hierarchical_Modeling_files/figure-html/carriage%20model%20-%20individual%20serotypes-3.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="co">#model version</span></span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>mean_year <span class="ot">&lt;-</span> (<span class="fu">max</span>(carriage_serotype_year_counts<span class="sc">$</span>year_id) <span class="sc">+</span> <span class="dv">1</span>) <span class="sc">/</span> <span class="dv">2</span></span>
+<span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-4"><a href="#cb41-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a data frame with expected log lambda for each serotype-year</span></span>
+<span id="cb41-5"><a href="#cb41-5" aria-hidden="true" tabindex="-1"></a>carriage_serotype_year_counts<span class="sc">$</span>expected_log_lambda <span class="ot">&lt;-</span> mu_means[carriage_serotype_year_counts<span class="sc">$</span>sero_id] <span class="sc">+</span> </span>
+<span id="cb41-6"><a href="#cb41-6" aria-hidden="true" tabindex="-1"></a>  beta_means[carriage_serotype_year_counts<span class="sc">$</span>sero_id] <span class="sc">*</span> (carriage_serotype_year_counts<span class="sc">$</span>year_id <span class="sc">-</span> mean_year)</span>
+<span id="cb41-7"><a href="#cb41-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-8"><a href="#cb41-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Convert to expected cases (lambda)</span></span>
+<span id="cb41-9"><a href="#cb41-9" aria-hidden="true" tabindex="-1"></a>carriage_serotype_year_counts<span class="sc">$</span>expected_cases <span class="ot">&lt;-</span> <span class="fu">exp</span>(carriage_serotype_year_counts<span class="sc">$</span>expected_log_lambda)</span>
+<span id="cb41-10"><a href="#cb41-10" aria-hidden="true" tabindex="-1"></a><span class="co">#plot</span></span>
+<span id="cb41-11"><a href="#cb41-11" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(carriage_serotype_year_counts, <span class="fu">aes</span>(<span class="at">x =</span> Year)) <span class="sc">+</span></span>
+<span id="cb41-12"><a href="#cb41-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">y =</span> cases), <span class="at">color =</span> <span class="st">"blue"</span>, <span class="at">alpha =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
+<span id="cb41-13"><a href="#cb41-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">y =</span> expected_cases, <span class="at">group =</span> Serotype), <span class="at">color =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb41-14"><a href="#cb41-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span> Serotype, <span class="at">scales =</span> <span class="st">"free_y"</span>) <span class="sc">+</span></span>
+<span id="cb41-15"><a href="#cb41-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">y =</span> <span class="st">"Cases"</span>, <span class="at">x =</span> <span class="st">"Year"</span>, <span class="at">title =</span> <span class="st">"Observed (points) vs Expected (lines) Cases by Serotype, Carriage"</span>) <span class="sc">+</span></span>
+<span id="cb41-16"><a href="#cb41-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb41-17"><a href="#cb41-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text.x =</span> <span class="fu">element_text</span>(<span class="at">angle =</span> <span class="dv">45</span>, <span class="at">hjust =</span> <span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Hierarchical_Modeling_files/figure-html/carriage%20model%20-%20individual%20serotypes-4.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Assign numeric IDs for JAGS</span></span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>carriage_groups <span class="ot">&lt;-</span> carriage_groups <span class="sc">%&gt;%</span></span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">sero_id =</span> <span class="fu">as.integer</span>(<span class="fu">factor</span>(Serotype)), <span class="co"># assigning IDs for serotypes</span></span>
+<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a>         <span class="at">year_id =</span> <span class="fu">as.integer</span>(<span class="fu">factor</span>(Year))) <span class="co"># assigning IDs for the year</span></span>
+<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-6"><a href="#cb42-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Create JAGS data list</span></span>
+<span id="cb42-7"><a href="#cb42-7" aria-hidden="true" tabindex="-1"></a>jdat <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb42-8"><a href="#cb42-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">N =</span> <span class="fu">nrow</span>(carriage_groups), <span class="co"># number of rows = number of cases</span></span>
+<span id="cb42-9"><a href="#cb42-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">cases =</span> carriage_groups<span class="sc">$</span>cases, <span class="co"># cases = cases</span></span>
+<span id="cb42-10"><a href="#cb42-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">sero_id =</span> carriage_groups<span class="sc">$</span>sero_id, <span class="co"># serotype IDs</span></span>
+<span id="cb42-11"><a href="#cb42-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">year_id =</span> carriage_groups<span class="sc">$</span>year_id, <span class="co"># year IDs</span></span>
+<span id="cb42-12"><a href="#cb42-12" aria-hidden="true" tabindex="-1"></a>  <span class="at">n_sero =</span> <span class="fu">length</span>(<span class="fu">unique</span>(carriage_groups<span class="sc">$</span>sero_id)), <span class="co"># number of unique serotypes</span></span>
+<span id="cb42-13"><a href="#cb42-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">n_year =</span> <span class="fu">length</span>(<span class="fu">unique</span>(carriage_groups<span class="sc">$</span>year_id)) <span class="co"># number of years</span></span>
+<span id="cb42-14"><a href="#cb42-14" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb42-15"><a href="#cb42-15" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="st">"Model2.R"</span>)</span>
+<span id="cb42-16"><a href="#cb42-16" aria-hidden="true" tabindex="-1"></a>model_path <span class="ot">&lt;-</span> <span class="st">"Model2.R"</span></span>
+<span id="cb42-17"><a href="#cb42-17" aria-hidden="true" tabindex="-1"></a><span class="co"># creates jags model based on the textConnection to the jcode file (Model2), using jdat</span></span>
+<span id="cb42-18"><a href="#cb42-18" aria-hidden="true" tabindex="-1"></a>mod <span class="ot">&lt;-</span> <span class="fu">jags.model</span>(<span class="fu">textConnection</span>(jcode), <span class="at">data =</span> jdat, <span class="at">n.chains =</span> <span class="dv">2</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Compiling model graph
+   Resolving undeclared variables
+   Allocating nodes
+Graph information:
+   Observed stochastic nodes: 40
+   Unobserved stochastic nodes: 10
+   Total graph size: 267
+
+Initializing model</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="fu">update</span>(mod, <span class="dv">1000</span>)  <span class="co"># burn-in</span></span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a><span class="co"># generates posterior samples based on mu and beta, iterates 5000 times</span></span>
+<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a>samp <span class="ot">&lt;-</span> <span class="fu">coda.samples</span>(mod, <span class="at">variable.names =</span> <span class="fu">c</span>(<span class="st">"mu"</span>, <span class="st">"beta"</span>), <span class="at">n.iter =</span> <span class="dv">5000</span>) </span>
+<span id="cb44-4"><a href="#cb44-4" aria-hidden="true" tabindex="-1"></a><span class="co"># summarizes samples: gives quantile for each variable</span></span>
+<span id="cb44-5"><a href="#cb44-5" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(samp)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Iterations = 2001:7000
+Thinning interval = 1 
+Number of chains = 2 
+Sample size per chain = 5000 
+
+1. Empirical mean and standard deviation for each variable,
+   plus standard error of the mean:
+
+            Mean      SD  Naive SE Time-series SE
+beta[1]  0.16531 0.01107 0.0001107      0.0001566
+beta[2] -0.06580 0.01466 0.0001466      0.0001896
+beta[3]  0.13425 0.01916 0.0001916      0.0002607
+beta[4]  0.06476 0.06489 0.0006489      0.0008280
+beta[5]  0.09759 0.01870 0.0001870      0.0002549
+mu[1]    5.29834 0.02586 0.0002586      0.0003701
+mu[2]    4.70924 0.03401 0.0003401      0.0004430
+mu[3]    4.17267 0.04393 0.0004393      0.0006064
+mu[4]    1.71810 0.15124 0.0015124      0.0019898
+mu[5]    4.23551 0.04363 0.0004363      0.0005822
+
+2. Quantiles for each variable:
+
+            2.5%      25%      50%      75%    97.5%
+beta[1]  0.14388  0.15779  0.16516  0.17278  0.18735
+beta[2] -0.09464 -0.07576 -0.06567 -0.05583 -0.03735
+beta[3]  0.09719  0.12103  0.13404  0.14743  0.17194
+beta[4] -0.06144  0.02061  0.06478  0.10868  0.19325
+beta[5]  0.06086  0.08509  0.09750  0.11015  0.13477
+mu[1]    5.24715  5.28080  5.29856  5.31570  5.34831
+mu[2]    4.64137  4.68649  4.70926  4.73196  4.77574
+mu[3]    4.08524  4.14317  4.17332  4.20252  4.25737
+mu[4]    1.40906  1.61983  1.71974  1.82136  2.00260
+mu[5]    4.14824  4.20666  4.23571  4.26578  4.31773</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a><span class="fu">par</span>(<span class="at">mar =</span> <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">2</span>, <span class="dv">2</span>, <span class="dv">2</span>))  <span class="co"># smaller margins</span></span>
+<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a><span class="co"># plot(samp)</span></span>
+<span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a><span class="co"># densplot(samp, main = "Posterior Density for Parameters")</span></span>
+<span id="cb46-4"><a href="#cb46-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb46-5"><a href="#cb46-5" aria-hidden="true" tabindex="-1"></a>posterior_summary <span class="ot">&lt;-</span> <span class="fu">summary</span>(samp)</span>
+<span id="cb46-6"><a href="#cb46-6" aria-hidden="true" tabindex="-1"></a><span class="co"># rounds estimates for each posterior value to 3 places</span></span>
+<span id="cb46-7"><a href="#cb46-7" aria-hidden="true" tabindex="-1"></a><span class="fu">round</span>(posterior_summary<span class="sc">$</span>statistics, <span class="dv">3</span>)  <span class="co"># means, SDs</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>          Mean    SD Naive SE Time-series SE
+beta[1]  0.165 0.011    0.000          0.000
+beta[2] -0.066 0.015    0.000          0.000
+beta[3]  0.134 0.019    0.000          0.000
+beta[4]  0.065 0.065    0.001          0.001
+beta[5]  0.098 0.019    0.000          0.000
+mu[1]    5.298 0.026    0.000          0.000
+mu[2]    4.709 0.034    0.000          0.000
+mu[3]    4.173 0.044    0.000          0.001
+mu[4]    1.718 0.151    0.002          0.002
+mu[5]    4.236 0.044    0.000          0.001</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb48"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a><span class="fu">round</span>(posterior_summary<span class="sc">$</span>quantiles, <span class="dv">3</span>)   <span class="co"># 2.5%, 50%, 97.5%</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>          2.5%    25%    50%    75%  97.5%
+beta[1]  0.144  0.158  0.165  0.173  0.187
+beta[2] -0.095 -0.076 -0.066 -0.056 -0.037
+beta[3]  0.097  0.121  0.134  0.147  0.172
+beta[4] -0.061  0.021  0.065  0.109  0.193
+beta[5]  0.061  0.085  0.098  0.110  0.135
+mu[1]    5.247  5.281  5.299  5.316  5.348
+mu[2]    4.641  4.686  4.709  4.732  4.776
+mu[3]    4.085  4.143  4.173  4.203  4.257
+mu[4]    1.409  1.620  1.720  1.821  2.003
+mu[5]    4.148  4.207  4.236  4.266  4.318</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb50"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a><span class="co"># creates matrix of all betas across all simulation runs</span></span>
+<span id="cb50-2"><a href="#cb50-2" aria-hidden="true" tabindex="-1"></a>beta_samples <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(samp)[, <span class="fu">grep</span>(<span class="st">"beta"</span>, <span class="fu">colnames</span>(<span class="fu">as.matrix</span>(samp)))]</span>
+<span id="cb50-3"><a href="#cb50-3" aria-hidden="true" tabindex="-1"></a><span class="co"># gives mean of each beta across all simulation runs</span></span>
+<span id="cb50-4"><a href="#cb50-4" aria-hidden="true" tabindex="-1"></a>beta_means <span class="ot">&lt;-</span> <span class="fu">apply</span>(beta_samples, <span class="dv">2</span>, mean)</span>
+<span id="cb50-5"><a href="#cb50-5" aria-hidden="true" tabindex="-1"></a><span class="co"># makes CI for each beta</span></span>
+<span id="cb50-6"><a href="#cb50-6" aria-hidden="true" tabindex="-1"></a>beta_ci <span class="ot">&lt;-</span> <span class="fu">apply</span>(beta_samples, <span class="dv">2</span>, quantile, <span class="at">probs =</span> <span class="fu">c</span>(<span class="fl">0.025</span>, <span class="fl">0.975</span>))</span>
+<span id="cb50-7"><a href="#cb50-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb50-8"><a href="#cb50-8" aria-hidden="true" tabindex="-1"></a><span class="co"># gives mean and CI</span></span>
+<span id="cb50-9"><a href="#cb50-9" aria-hidden="true" tabindex="-1"></a>df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb50-10"><a href="#cb50-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">param =</span> <span class="fu">colnames</span>(beta_samples),</span>
+<span id="cb50-11"><a href="#cb50-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">mean =</span> beta_means,</span>
+<span id="cb50-12"><a href="#cb50-12" aria-hidden="true" tabindex="-1"></a>  <span class="at">lower =</span> beta_ci[<span class="dv">1</span>, ],</span>
+<span id="cb50-13"><a href="#cb50-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">upper =</span> beta_ci[<span class="dv">2</span>, ]</span>
+<span id="cb50-14"><a href="#cb50-14" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb50-15"><a href="#cb50-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb50-16"><a href="#cb50-16" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(df, <span class="fu">aes</span>(<span class="at">x =</span> param, <span class="at">y =</span> mean)) <span class="sc">+</span></span>
+<span id="cb50-17"><a href="#cb50-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb50-18"><a href="#cb50-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_errorbar</span>(<span class="fu">aes</span>(<span class="at">ymin =</span> lower, <span class="at">ymax =</span> upper), <span class="at">width =</span> <span class="fl">0.2</span>) <span class="sc">+</span></span>
+<span id="cb50-19"><a href="#cb50-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_flip</span>() <span class="sc">+</span></span>
+<span id="cb50-20"><a href="#cb50-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Posterior Estimates for Beta"</span>, <span class="at">y =</span> <span class="st">"Effect Size"</span>, <span class="at">x =</span> <span class="st">""</span>) <span class="sc">+</span></span>
+<span id="cb50-21"><a href="#cb50-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Hierarchical_Modeling_files/figure-html/carriage%20model%20-%20serotypes%20grouped%20by%20vaccine-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb51"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a><span class="co">#heatmap</span></span>
+<span id="cb51-2"><a href="#cb51-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Your original year and serotype info</span></span>
+<span id="cb51-3"><a href="#cb51-3" aria-hidden="true" tabindex="-1"></a>year_seq <span class="ot">&lt;-</span> <span class="fu">sort</span>(<span class="fu">unique</span>(jdat<span class="sc">$</span>year_id))  <span class="co"># e.g., 2000:2006</span></span>
+<span id="cb51-4"><a href="#cb51-4" aria-hidden="true" tabindex="-1"></a>sero_seq <span class="ot">&lt;-</span> <span class="dv">1</span><span class="sc">:</span>jdat<span class="sc">$</span>n_sero</span>
+<span id="cb51-5"><a href="#cb51-5" aria-hidden="true" tabindex="-1"></a>mean_year <span class="ot">&lt;-</span> (<span class="fu">length</span>(year_seq) <span class="sc">+</span> <span class="dv">1</span>) <span class="sc">/</span> <span class="dv">2</span></span>
+<span id="cb51-6"><a href="#cb51-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb51-7"><a href="#cb51-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a dataframe of all serotype-year combinations</span></span>
+<span id="cb51-8"><a href="#cb51-8" aria-hidden="true" tabindex="-1"></a>pred_grid <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(</span>
+<span id="cb51-9"><a href="#cb51-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">sero =</span> sero_seq,</span>
+<span id="cb51-10"><a href="#cb51-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">year =</span> year_seq</span>
+<span id="cb51-11"><a href="#cb51-11" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb51-12"><a href="#cb51-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb51-13"><a href="#cb51-13" aria-hidden="true" tabindex="-1"></a>samp_mat <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(samp)</span>
+<span id="cb51-14"><a href="#cb51-14" aria-hidden="true" tabindex="-1"></a>mu_means <span class="ot">&lt;-</span> <span class="fu">colMeans</span>(samp_mat[, <span class="fu">grep</span>(<span class="st">"^mu</span><span class="sc">\\</span><span class="st">["</span>, <span class="fu">colnames</span>(samp_mat))])</span>
+<span id="cb51-15"><a href="#cb51-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb51-16"><a href="#cb51-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb51-17"><a href="#cb51-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Predict expected log incidence</span></span>
+<span id="cb51-18"><a href="#cb51-18" aria-hidden="true" tabindex="-1"></a>pred_grid<span class="sc">$</span>log_lambda <span class="ot">&lt;-</span> mu_means[pred_grid<span class="sc">$</span>sero] <span class="sc">+</span></span>
+<span id="cb51-19"><a href="#cb51-19" aria-hidden="true" tabindex="-1"></a>  beta_means[pred_grid<span class="sc">$</span>sero] <span class="sc">*</span> (pred_grid<span class="sc">$</span>year <span class="sc">-</span> mean_year)</span>
+<span id="cb51-20"><a href="#cb51-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb51-21"><a href="#cb51-21" aria-hidden="true" tabindex="-1"></a><span class="co"># Back-transform to incidence</span></span>
+<span id="cb51-22"><a href="#cb51-22" aria-hidden="true" tabindex="-1"></a>pred_grid<span class="sc">$</span>lambda <span class="ot">&lt;-</span> <span class="fu">exp</span>(pred_grid<span class="sc">$</span>log_lambda)</span>
+<span id="cb51-23"><a href="#cb51-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb51-24"><a href="#cb51-24" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(pred_grid, <span class="fu">aes</span>(<span class="at">x =</span> year, <span class="at">y =</span> <span class="fu">factor</span>(sero), <span class="at">fill =</span> lambda)) <span class="sc">+</span></span>
+<span id="cb51-25"><a href="#cb51-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_tile</span>(<span class="at">color =</span> <span class="st">"white"</span>) <span class="sc">+</span></span>
+<span id="cb51-26"><a href="#cb51-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_viridis_c</span>(<span class="at">name =</span> <span class="st">"Expected</span><span class="sc">\n</span><span class="st">Cases"</span>, <span class="at">option =</span> <span class="st">"C"</span>) <span class="sc">+</span></span>
+<span id="cb51-27"><a href="#cb51-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Year"</span>, <span class="at">y =</span> <span class="st">"Serotype"</span>, <span class="at">title =</span> <span class="st">"Expected Cases by Year and Serotype"</span>) <span class="sc">+</span></span>
+<span id="cb51-28"><a href="#cb51-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb51-29"><a href="#cb51-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text.y =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">8</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Hierarchical_Modeling_files/figure-html/carriage%20model%20-%20serotypes%20grouped%20by%20vaccine-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb52"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(carriage_groups, <span class="fu">aes</span>(<span class="at">x =</span> Year, <span class="at">y =</span> Serotype, <span class="at">fill =</span> cases)) <span class="sc">+</span></span>
+<span id="cb52-2"><a href="#cb52-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_tile</span>(<span class="at">color =</span> <span class="st">"white"</span>) <span class="sc">+</span></span>
+<span id="cb52-3"><a href="#cb52-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_viridis_c</span>(<span class="at">option =</span> <span class="st">"C"</span>, <span class="at">name =</span> <span class="st">"Cases"</span>) <span class="sc">+</span></span>
+<span id="cb52-4"><a href="#cb52-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"IPD Cases by Serotype and Year"</span>,</span>
+<span id="cb52-5"><a href="#cb52-5" aria-hidden="true" tabindex="-1"></a>       <span class="at">x =</span> <span class="st">"Year"</span>,</span>
+<span id="cb52-6"><a href="#cb52-6" aria-hidden="true" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">"Serotype"</span>) <span class="sc">+</span></span>
+<span id="cb52-7"><a href="#cb52-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb52-8"><a href="#cb52-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text.x =</span> <span class="fu">element_text</span>(<span class="at">angle =</span> <span class="dv">45</span>, <span class="at">hjust =</span> <span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Hierarchical_Modeling_files/figure-html/carriage%20model%20-%20serotypes%20grouped%20by%20vaccine-3.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb53"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a><span class="co">#model version</span></span>
+<span id="cb53-2"><a href="#cb53-2" aria-hidden="true" tabindex="-1"></a>mean_year <span class="ot">&lt;-</span> (<span class="fu">max</span>(carriage_groups<span class="sc">$</span>year_id) <span class="sc">+</span> <span class="dv">1</span>) <span class="sc">/</span> <span class="dv">2</span></span>
+<span id="cb53-3"><a href="#cb53-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb53-4"><a href="#cb53-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a data frame with expected log lambda for each serotype-year</span></span>
+<span id="cb53-5"><a href="#cb53-5" aria-hidden="true" tabindex="-1"></a>carriage_groups<span class="sc">$</span>expected_log_lambda <span class="ot">&lt;-</span> mu_means[carriage_groups<span class="sc">$</span>sero_id] <span class="sc">+</span> </span>
+<span id="cb53-6"><a href="#cb53-6" aria-hidden="true" tabindex="-1"></a>  beta_means[carriage_groups<span class="sc">$</span>sero_id] <span class="sc">*</span> (carriage_groups<span class="sc">$</span>year_id <span class="sc">-</span> mean_year)</span>
+<span id="cb53-7"><a href="#cb53-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb53-8"><a href="#cb53-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Convert to expected cases (lambda)</span></span>
+<span id="cb53-9"><a href="#cb53-9" aria-hidden="true" tabindex="-1"></a>carriage_groups<span class="sc">$</span>expected_cases <span class="ot">&lt;-</span> <span class="fu">exp</span>(carriage_groups<span class="sc">$</span>expected_log_lambda)</span>
+<span id="cb53-10"><a href="#cb53-10" aria-hidden="true" tabindex="-1"></a><span class="co">#plot</span></span>
+<span id="cb53-11"><a href="#cb53-11" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(carriage_groups, <span class="fu">aes</span>(<span class="at">x =</span> Year)) <span class="sc">+</span></span>
+<span id="cb53-12"><a href="#cb53-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">y =</span> cases), <span class="at">color =</span> <span class="st">"blue"</span>, <span class="at">alpha =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
+<span id="cb53-13"><a href="#cb53-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">y =</span> expected_cases, <span class="at">group =</span> Serotype), <span class="at">color =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb53-14"><a href="#cb53-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span> Serotype, <span class="at">scales =</span> <span class="st">"free_y"</span>) <span class="sc">+</span></span>
+<span id="cb53-15"><a href="#cb53-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">y =</span> <span class="st">"Cases"</span>, <span class="at">x =</span> <span class="st">"Year"</span>, <span class="at">title =</span> <span class="st">"Observed (points) vs Expected (lines) Cases by Serotype, Carriage"</span>) <span class="sc">+</span></span>
+<span id="cb53-16"><a href="#cb53-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb53-17"><a href="#cb53-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text.x =</span> <span class="fu">element_text</span>(<span class="at">angle =</span> <span class="dv">45</span>, <span class="at">hjust =</span> <span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Hierarchical_Modeling_files/figure-html/carriage%20model%20-%20serotypes%20grouped%20by%20vaccine-4.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb54"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Assign numeric IDs for JAGS</span></span>
+<span id="cb54-2"><a href="#cb54-2" aria-hidden="true" tabindex="-1"></a>disease_serotype_year_counts <span class="ot">&lt;-</span> disease_serotype_year_counts <span class="sc">%&gt;%</span></span>
+<span id="cb54-3"><a href="#cb54-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">sero_id =</span> <span class="fu">as.integer</span>(<span class="fu">factor</span>(Serotype)), <span class="co"># assigning IDs for serotypes</span></span>
+<span id="cb54-4"><a href="#cb54-4" aria-hidden="true" tabindex="-1"></a>         <span class="at">year_id =</span> <span class="fu">as.integer</span>(<span class="fu">factor</span>(Year))) <span class="co"># assigning IDs for the year</span></span>
+<span id="cb54-5"><a href="#cb54-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb54-6"><a href="#cb54-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Create JAGS data list</span></span>
+<span id="cb54-7"><a href="#cb54-7" aria-hidden="true" tabindex="-1"></a>jdat <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb54-8"><a href="#cb54-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">N =</span> <span class="fu">nrow</span>(disease_serotype_year_counts), <span class="co"># number of rows = number of cases</span></span>
+<span id="cb54-9"><a href="#cb54-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">cases =</span> disease_serotype_year_counts<span class="sc">$</span>cases, <span class="co"># cases = cases</span></span>
+<span id="cb54-10"><a href="#cb54-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">sero_id =</span> disease_serotype_year_counts<span class="sc">$</span>sero_id, <span class="co"># serotype IDs</span></span>
+<span id="cb54-11"><a href="#cb54-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">year_id =</span> disease_serotype_year_counts<span class="sc">$</span>year_id, <span class="co"># year IDs</span></span>
+<span id="cb54-12"><a href="#cb54-12" aria-hidden="true" tabindex="-1"></a>  <span class="at">n_sero =</span> <span class="fu">length</span>(<span class="fu">unique</span>(disease_serotype_year_counts<span class="sc">$</span>sero_id)), <span class="co"># number of unique serotypes</span></span>
+<span id="cb54-13"><a href="#cb54-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">n_year =</span> <span class="fu">length</span>(<span class="fu">unique</span>(disease_serotype_year_counts<span class="sc">$</span>year_id)) <span class="co"># number of years</span></span>
+<span id="cb54-14"><a href="#cb54-14" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb54-15"><a href="#cb54-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb54-16"><a href="#cb54-16" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(rjags)</span>
+<span id="cb54-17"><a href="#cb54-17" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="st">"Model2.R"</span>)</span>
+<span id="cb54-18"><a href="#cb54-18" aria-hidden="true" tabindex="-1"></a>model_path <span class="ot">&lt;-</span> <span class="st">"Model2.R"</span></span>
+<span id="cb54-19"><a href="#cb54-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb54-20"><a href="#cb54-20" aria-hidden="true" tabindex="-1"></a><span class="co"># creates jags model based on the textConnection to the jcode file (Model2), using jdat</span></span>
+<span id="cb54-21"><a href="#cb54-21" aria-hidden="true" tabindex="-1"></a>mod <span class="ot">&lt;-</span> <span class="fu">jags.model</span>(<span class="fu">textConnection</span>(jcode), <span class="at">data =</span> jdat, <span class="at">n.chains =</span> <span class="dv">2</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Compiling model graph
+   Resolving undeclared variables
+   Allocating nodes
+Graph information:
+   Observed stochastic nodes: 88
+   Unobserved stochastic nodes: 44
+   Total graph size: 588
+
+Initializing model</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb56"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a><span class="fu">update</span>(mod, <span class="dv">1000</span>)  <span class="co"># burn-in</span></span>
+<span id="cb56-2"><a href="#cb56-2" aria-hidden="true" tabindex="-1"></a><span class="co"># generates posterior samples based on mu and beta, iterates 5000 times</span></span>
+<span id="cb56-3"><a href="#cb56-3" aria-hidden="true" tabindex="-1"></a>samp <span class="ot">&lt;-</span> <span class="fu">coda.samples</span>(mod, <span class="at">variable.names =</span> <span class="fu">c</span>(<span class="st">"mu"</span>, <span class="st">"beta"</span>), <span class="at">n.iter =</span> <span class="dv">5000</span>) </span>
+<span id="cb56-4"><a href="#cb56-4" aria-hidden="true" tabindex="-1"></a><span class="co"># summarizes samples: gives quantile for each variable</span></span>
+<span id="cb56-5"><a href="#cb56-5" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(samp)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Iterations = 2001:7000
+Thinning interval = 1 
+Number of chains = 2 
+Sample size per chain = 5000 
+
+1. Empirical mean and standard deviation for each variable,
+   plus standard error of the mean:
+
+               Mean       SD  Naive SE Time-series SE
+beta[1]   -0.056365  0.08779 0.0008779      0.0011428
+beta[2]    0.095382  0.22166 0.0022166      0.0033993
+beta[3]   -0.331189  0.50206 0.0050206      0.0109955
+beta[4]   -0.080321  0.17812 0.0017812      0.0025644
+beta[5]    0.219773  0.17500 0.0017500      0.0036747
+beta[6]   -0.154123  0.38311 0.0038311      0.0093874
+beta[7]    1.887975  6.74047 0.0674047      1.5831814
+beta[8]   -0.025281  0.18319 0.0018319      0.0024115
+beta[9]    0.163617  0.26116 0.0026116      0.0048150
+beta[10]   6.498819 12.37282 0.1237282      3.9144718
+beta[11]  -0.003190  0.35525 0.0035525      0.0070939
+beta[12]   0.038941  0.20579 0.0020579      0.0030771
+beta[13]   0.483495  0.23140 0.0023140      0.0061476
+beta[14]  -0.463581  0.38778 0.0038778      0.0082826
+beta[15]  -0.007581  0.61621 0.0061621      0.0170215
+beta[16]  -0.249575  0.37759 0.0037759      0.0060189
+beta[17]  -0.233922  0.35083 0.0035083      0.0050728
+beta[18]   0.450691  0.10194 0.0010194      0.0028746
+beta[19]   0.071423  0.05511 0.0005511      0.0007145
+beta[20]   0.391564  0.12567 0.0012567      0.0027102
+beta[21]   0.179976  1.68592 0.0168592      0.1623011
+beta[22]   0.094155  0.14128 0.0014128      0.0019894
+mu[1]      1.514957  0.17580 0.0017580      0.0023627
+mu[2]     -0.071126  0.49320 0.0049320      0.0081273
+mu[3]      0.385791  0.70991 0.0070991      0.0161867
+mu[4]      0.745541  0.33173 0.0033173      0.0049420
+mu[5]      0.763474  0.40131 0.0040131      0.0088727
+mu[6]      0.450345  0.67412 0.0067412      0.0178716
+mu[7]     -6.221809 20.20614 0.2020614      4.7795220
+mu[8]      0.176305  0.41824 0.0041824      0.0059801
+mu[9]     -0.144027  0.58232 0.0058232      0.0111838
+mu[10]   -13.562622 24.74602 0.2474602      7.7977949
+mu[11]    -0.251826  0.67762 0.0067762      0.0143328
+mu[12]     0.387548  0.43949 0.0043949      0.0069824
+mu[13]     0.186596  0.54016 0.0054016      0.0148342
+mu[14]     0.974283  0.55040 0.0055040      0.0122110
+mu[15]    -0.570311  1.29046 0.0129046      0.0402670
+mu[16]    -0.090214  0.75631 0.0075631      0.0140489
+mu[17]    -0.055591  0.59957 0.0059957      0.0099520
+mu[18]     1.776496  0.23587 0.0023587      0.0067811
+mu[19]     2.427158  0.11300 0.0011300      0.0014804
+mu[20]     1.059834  0.27348 0.0027348      0.0060611
+mu[21]    -1.010417  4.39090 0.0439090      0.4335237
+mu[22]     0.658550  0.30621 0.0030621      0.0045208
+
+2. Quantiles for each variable:
+
+              2.5%        25%        50%       75%   97.5%
+beta[1]   -0.22595  -0.114120 -5.590e-02  0.001427  0.1167
+beta[2]   -0.30898  -0.057497  8.236e-02  0.235211  0.5648
+beta[3]   -1.44142  -0.625330 -2.903e-01  0.012518  0.5538
+beta[4]   -0.42781  -0.198013 -8.103e-02  0.037488  0.2717
+beta[5]   -0.10666   0.100782  2.138e-01  0.330117  0.5874
+beta[6]   -0.91177  -0.409519 -1.487e-01  0.099781  0.5920
+beta[7]  -11.27204  -3.221219  3.088e+00  7.294637 12.4800
+beta[8]   -0.39358  -0.144897 -2.332e-02  0.097028  0.3335
+beta[9]   -0.32201  -0.013435  1.547e-01  0.328716  0.7048
+beta[10] -18.18775  -3.261351  8.740e+00 16.048082 26.1255
+beta[11]  -0.71360  -0.228690 -5.632e-03  0.217836  0.7240
+beta[12]  -0.35644  -0.099823  3.426e-02  0.172808  0.4585
+beta[13]   0.04804   0.327352  4.772e-01  0.626806  0.9587
+beta[14]  -1.30156  -0.703385 -4.394e-01 -0.208639  0.2614
+beta[15]  -1.27137  -0.375428 -4.796e-04  0.351824  1.2557
+beta[16]  -1.09005  -0.464759 -2.288e-01  0.001215  0.4282
+beta[17]  -0.96681  -0.454186 -2.199e-01 -0.001327  0.4234
+beta[18]   0.25638   0.380574  4.485e-01  0.519493  0.6534
+beta[19]  -0.03615   0.034575  7.173e-02  0.108665  0.1789
+beta[20]   0.15560   0.305305  3.894e-01  0.474208  0.6422
+beta[21]  -2.96484  -0.901931  8.243e-02  1.200116  3.7487
+beta[22]  -0.17172  -0.001068  8.906e-02  0.185577  0.3769
+mu[1]      1.15227   1.399541  1.521e+00  1.638486  1.8432
+mu[2]     -1.15641  -0.365174 -2.371e-02  0.272815  0.7760
+mu[3]     -1.20111  -0.046841  4.449e-01  0.889741  1.5809
+mu[4]      0.03261   0.538783  7.678e-01  0.977824  1.3404
+mu[5]     -0.10647   0.516959  7.924e-01  1.041802  1.4651
+mu[6]     -1.05386   0.038303  5.066e-01  0.932712  1.6008
+mu[7]    -38.02954 -22.314517 -9.946e+00  9.155333 33.2985
+mu[8]     -0.71153  -0.083069  2.000e-01  0.472684  0.9049
+mu[9]     -1.43471  -0.497465 -8.621e-02  0.272755  0.8215
+mu[10]   -52.66448 -32.314125 -1.807e+01  6.050933 36.0933
+mu[11]    -1.78678  -0.648752 -1.715e-01  0.227320  0.8589
+mu[12]    -0.56779   0.117557  4.221e-01  0.693752  1.1552
+mu[13]    -1.00557  -0.131812  2.345e-01  0.565672  1.1016
+mu[14]    -0.21329   0.639612  1.015e+00  1.353751  1.9438
+mu[15]    -3.78362  -1.245062 -3.423e-01  0.330940  1.2981
+mu[16]    -1.87740  -0.507336  9.315e-03  0.439759  1.1130
+mu[17]    -1.41200  -0.409443  1.011e-02  0.364144  0.9404
+mu[18]     1.29636   1.619569  1.785e+00  1.942452  2.2111
+mu[19]     2.19948   2.351567  2.428e+00  2.505992  2.6419
+mu[20]     0.47855   0.881552  1.076e+00  1.251003  1.5610
+mu[21]   -10.97206  -3.509422 -4.845e-01  1.905047  6.5266
+mu[22]     0.01055   0.464728  6.747e-01  0.871277  1.2081</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb58"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(coda)</span>
+<span id="cb58-2"><a href="#cb58-2" aria-hidden="true" tabindex="-1"></a><span class="fu">par</span>(<span class="at">mar =</span> <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">2</span>, <span class="dv">2</span>, <span class="dv">2</span>))  <span class="co"># smaller margins</span></span>
+<span id="cb58-3"><a href="#cb58-3" aria-hidden="true" tabindex="-1"></a><span class="co"># plot(samp)</span></span>
+<span id="cb58-4"><a href="#cb58-4" aria-hidden="true" tabindex="-1"></a><span class="co"># densplot(samp, main = "Posterior Density for Parameters")</span></span>
+<span id="cb58-5"><a href="#cb58-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb58-6"><a href="#cb58-6" aria-hidden="true" tabindex="-1"></a>posterior_summary <span class="ot">&lt;-</span> <span class="fu">summary</span>(samp)</span>
+<span id="cb58-7"><a href="#cb58-7" aria-hidden="true" tabindex="-1"></a><span class="co"># rounds estimates for each posterior value to 3 places</span></span>
+<span id="cb58-8"><a href="#cb58-8" aria-hidden="true" tabindex="-1"></a><span class="fu">round</span>(posterior_summary<span class="sc">$</span>statistics, <span class="dv">3</span>)  <span class="co"># means, SDs</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>            Mean     SD Naive SE Time-series SE
+beta[1]   -0.056  0.088    0.001          0.001
+beta[2]    0.095  0.222    0.002          0.003
+beta[3]   -0.331  0.502    0.005          0.011
+beta[4]   -0.080  0.178    0.002          0.003
+beta[5]    0.220  0.175    0.002          0.004
+beta[6]   -0.154  0.383    0.004          0.009
+beta[7]    1.888  6.740    0.067          1.583
+beta[8]   -0.025  0.183    0.002          0.002
+beta[9]    0.164  0.261    0.003          0.005
+beta[10]   6.499 12.373    0.124          3.914
+beta[11]  -0.003  0.355    0.004          0.007
+beta[12]   0.039  0.206    0.002          0.003
+beta[13]   0.483  0.231    0.002          0.006
+beta[14]  -0.464  0.388    0.004          0.008
+beta[15]  -0.008  0.616    0.006          0.017
+beta[16]  -0.250  0.378    0.004          0.006
+beta[17]  -0.234  0.351    0.004          0.005
+beta[18]   0.451  0.102    0.001          0.003
+beta[19]   0.071  0.055    0.001          0.001
+beta[20]   0.392  0.126    0.001          0.003
+beta[21]   0.180  1.686    0.017          0.162
+beta[22]   0.094  0.141    0.001          0.002
+mu[1]      1.515  0.176    0.002          0.002
+mu[2]     -0.071  0.493    0.005          0.008
+mu[3]      0.386  0.710    0.007          0.016
+mu[4]      0.746  0.332    0.003          0.005
+mu[5]      0.763  0.401    0.004          0.009
+mu[6]      0.450  0.674    0.007          0.018
+mu[7]     -6.222 20.206    0.202          4.780
+mu[8]      0.176  0.418    0.004          0.006
+mu[9]     -0.144  0.582    0.006          0.011
+mu[10]   -13.563 24.746    0.247          7.798
+mu[11]    -0.252  0.678    0.007          0.014
+mu[12]     0.388  0.439    0.004          0.007
+mu[13]     0.187  0.540    0.005          0.015
+mu[14]     0.974  0.550    0.006          0.012
+mu[15]    -0.570  1.290    0.013          0.040
+mu[16]    -0.090  0.756    0.008          0.014
+mu[17]    -0.056  0.600    0.006          0.010
+mu[18]     1.776  0.236    0.002          0.007
+mu[19]     2.427  0.113    0.001          0.001
+mu[20]     1.060  0.273    0.003          0.006
+mu[21]    -1.010  4.391    0.044          0.434
+mu[22]     0.659  0.306    0.003          0.005</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb60"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb60-1"><a href="#cb60-1" aria-hidden="true" tabindex="-1"></a><span class="fu">round</span>(posterior_summary<span class="sc">$</span>quantiles, <span class="dv">3</span>)   <span class="co"># 2.5%, 50%, 97.5%</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>            2.5%     25%     50%    75%  97.5%
+beta[1]   -0.226  -0.114  -0.056  0.001  0.117
+beta[2]   -0.309  -0.057   0.082  0.235  0.565
+beta[3]   -1.441  -0.625  -0.290  0.013  0.554
+beta[4]   -0.428  -0.198  -0.081  0.037  0.272
+beta[5]   -0.107   0.101   0.214  0.330  0.587
+beta[6]   -0.912  -0.410  -0.149  0.100  0.592
+beta[7]  -11.272  -3.221   3.088  7.295 12.480
+beta[8]   -0.394  -0.145  -0.023  0.097  0.333
+beta[9]   -0.322  -0.013   0.155  0.329  0.705
+beta[10] -18.188  -3.261   8.740 16.048 26.126
+beta[11]  -0.714  -0.229  -0.006  0.218  0.724
+beta[12]  -0.356  -0.100   0.034  0.173  0.458
+beta[13]   0.048   0.327   0.477  0.627  0.959
+beta[14]  -1.302  -0.703  -0.439 -0.209  0.261
+beta[15]  -1.271  -0.375   0.000  0.352  1.256
+beta[16]  -1.090  -0.465  -0.229  0.001  0.428
+beta[17]  -0.967  -0.454  -0.220 -0.001  0.423
+beta[18]   0.256   0.381   0.449  0.519  0.653
+beta[19]  -0.036   0.035   0.072  0.109  0.179
+beta[20]   0.156   0.305   0.389  0.474  0.642
+beta[21]  -2.965  -0.902   0.082  1.200  3.749
+beta[22]  -0.172  -0.001   0.089  0.186  0.377
+mu[1]      1.152   1.400   1.521  1.638  1.843
+mu[2]     -1.156  -0.365  -0.024  0.273  0.776
+mu[3]     -1.201  -0.047   0.445  0.890  1.581
+mu[4]      0.033   0.539   0.768  0.978  1.340
+mu[5]     -0.106   0.517   0.792  1.042  1.465
+mu[6]     -1.054   0.038   0.507  0.933  1.601
+mu[7]    -38.030 -22.315  -9.946  9.155 33.298
+mu[8]     -0.712  -0.083   0.200  0.473  0.905
+mu[9]     -1.435  -0.497  -0.086  0.273  0.821
+mu[10]   -52.664 -32.314 -18.070  6.051 36.093
+mu[11]    -1.787  -0.649  -0.171  0.227  0.859
+mu[12]    -0.568   0.118   0.422  0.694  1.155
+mu[13]    -1.006  -0.132   0.234  0.566  1.102
+mu[14]    -0.213   0.640   1.015  1.354  1.944
+mu[15]    -3.784  -1.245  -0.342  0.331  1.298
+mu[16]    -1.877  -0.507   0.009  0.440  1.113
+mu[17]    -1.412  -0.409   0.010  0.364  0.940
+mu[18]     1.296   1.620   1.785  1.942  2.211
+mu[19]     2.199   2.352   2.428  2.506  2.642
+mu[20]     0.479   0.882   1.076  1.251  1.561
+mu[21]   -10.972  -3.509  -0.485  1.905  6.527
+mu[22]     0.011   0.465   0.675  0.871  1.208</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb62"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb62-1"><a href="#cb62-1" aria-hidden="true" tabindex="-1"></a><span class="co"># creates matrix of all betas across all simulation runs</span></span>
+<span id="cb62-2"><a href="#cb62-2" aria-hidden="true" tabindex="-1"></a>beta_samples <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(samp)[, <span class="fu">grep</span>(<span class="st">"beta"</span>, <span class="fu">colnames</span>(<span class="fu">as.matrix</span>(samp)))]</span>
+<span id="cb62-3"><a href="#cb62-3" aria-hidden="true" tabindex="-1"></a><span class="co"># gives mean of each beta across all simulation runs</span></span>
+<span id="cb62-4"><a href="#cb62-4" aria-hidden="true" tabindex="-1"></a>beta_means <span class="ot">&lt;-</span> <span class="fu">apply</span>(beta_samples, <span class="dv">2</span>, mean)</span>
+<span id="cb62-5"><a href="#cb62-5" aria-hidden="true" tabindex="-1"></a><span class="co"># makes CI for each beta</span></span>
+<span id="cb62-6"><a href="#cb62-6" aria-hidden="true" tabindex="-1"></a>beta_ci <span class="ot">&lt;-</span> <span class="fu">apply</span>(beta_samples, <span class="dv">2</span>, quantile, <span class="at">probs =</span> <span class="fu">c</span>(<span class="fl">0.025</span>, <span class="fl">0.975</span>))</span>
+<span id="cb62-7"><a href="#cb62-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb62-8"><a href="#cb62-8" aria-hidden="true" tabindex="-1"></a><span class="co"># gives mean and CI</span></span>
+<span id="cb62-9"><a href="#cb62-9" aria-hidden="true" tabindex="-1"></a>df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb62-10"><a href="#cb62-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">param =</span> <span class="fu">colnames</span>(beta_samples),</span>
+<span id="cb62-11"><a href="#cb62-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">mean =</span> beta_means,</span>
+<span id="cb62-12"><a href="#cb62-12" aria-hidden="true" tabindex="-1"></a>  <span class="at">lower =</span> beta_ci[<span class="dv">1</span>, ],</span>
+<span id="cb62-13"><a href="#cb62-13" aria-hidden="true" tabindex="-1"></a>  <span class="at">upper =</span> beta_ci[<span class="dv">2</span>, ]</span>
+<span id="cb62-14"><a href="#cb62-14" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb62-15"><a href="#cb62-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb62-16"><a href="#cb62-16" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb62-17"><a href="#cb62-17" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(df, <span class="fu">aes</span>(<span class="at">x =</span> param, <span class="at">y =</span> mean)) <span class="sc">+</span></span>
+<span id="cb62-18"><a href="#cb62-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb62-19"><a href="#cb62-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_errorbar</span>(<span class="fu">aes</span>(<span class="at">ymin =</span> lower, <span class="at">ymax =</span> upper), <span class="at">width =</span> <span class="fl">0.2</span>) <span class="sc">+</span></span>
+<span id="cb62-20"><a href="#cb62-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_flip</span>() <span class="sc">+</span></span>
+<span id="cb62-21"><a href="#cb62-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Posterior Estimates for Beta"</span>, <span class="at">y =</span> <span class="st">"Effect Size"</span>, <span class="at">x =</span> <span class="st">""</span>) <span class="sc">+</span></span>
+<span id="cb62-22"><a href="#cb62-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Hierarchical_Modeling_files/figure-html/hierarchical%20modeling%20disease-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb63"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb63-1"><a href="#cb63-1" aria-hidden="true" tabindex="-1"></a><span class="co">#heatmap</span></span>
+<span id="cb63-2"><a href="#cb63-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Your original year and serotype info</span></span>
+<span id="cb63-3"><a href="#cb63-3" aria-hidden="true" tabindex="-1"></a>year_seq <span class="ot">&lt;-</span> <span class="fu">sort</span>(<span class="fu">unique</span>(jdat<span class="sc">$</span>year_id))  <span class="co"># e.g., 2000:2006</span></span>
+<span id="cb63-4"><a href="#cb63-4" aria-hidden="true" tabindex="-1"></a>sero_seq <span class="ot">&lt;-</span> <span class="dv">1</span><span class="sc">:</span>jdat<span class="sc">$</span>n_sero</span>
+<span id="cb63-5"><a href="#cb63-5" aria-hidden="true" tabindex="-1"></a>mean_year <span class="ot">&lt;-</span> (<span class="fu">length</span>(year_seq) <span class="sc">+</span> <span class="dv">1</span>) <span class="sc">/</span> <span class="dv">2</span></span>
+<span id="cb63-6"><a href="#cb63-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb63-7"><a href="#cb63-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a dataframe of all serotype-year combinations</span></span>
+<span id="cb63-8"><a href="#cb63-8" aria-hidden="true" tabindex="-1"></a>pred_grid <span class="ot">&lt;-</span> <span class="fu">expand.grid</span>(</span>
+<span id="cb63-9"><a href="#cb63-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">sero =</span> sero_seq,</span>
+<span id="cb63-10"><a href="#cb63-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">year =</span> year_seq</span>
+<span id="cb63-11"><a href="#cb63-11" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb63-12"><a href="#cb63-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb63-13"><a href="#cb63-13" aria-hidden="true" tabindex="-1"></a>samp_mat <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(samp)</span>
+<span id="cb63-14"><a href="#cb63-14" aria-hidden="true" tabindex="-1"></a>mu_means <span class="ot">&lt;-</span> <span class="fu">colMeans</span>(samp_mat[, <span class="fu">grep</span>(<span class="st">"^mu</span><span class="sc">\\</span><span class="st">["</span>, <span class="fu">colnames</span>(samp_mat))])</span>
+<span id="cb63-15"><a href="#cb63-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb63-16"><a href="#cb63-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb63-17"><a href="#cb63-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Predict expected log incidence</span></span>
+<span id="cb63-18"><a href="#cb63-18" aria-hidden="true" tabindex="-1"></a>pred_grid<span class="sc">$</span>log_lambda <span class="ot">&lt;-</span> mu_means[pred_grid<span class="sc">$</span>sero] <span class="sc">+</span></span>
+<span id="cb63-19"><a href="#cb63-19" aria-hidden="true" tabindex="-1"></a>  beta_means[pred_grid<span class="sc">$</span>sero] <span class="sc">*</span> (pred_grid<span class="sc">$</span>year <span class="sc">-</span> mean_year)</span>
+<span id="cb63-20"><a href="#cb63-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb63-21"><a href="#cb63-21" aria-hidden="true" tabindex="-1"></a><span class="co"># Back-transform to incidence</span></span>
+<span id="cb63-22"><a href="#cb63-22" aria-hidden="true" tabindex="-1"></a>pred_grid<span class="sc">$</span>lambda <span class="ot">&lt;-</span> <span class="fu">exp</span>(pred_grid<span class="sc">$</span>log_lambda)</span>
+<span id="cb63-23"><a href="#cb63-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb63-24"><a href="#cb63-24" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(pred_grid, <span class="fu">aes</span>(<span class="at">x =</span> year, <span class="at">y =</span> <span class="fu">factor</span>(sero), <span class="at">fill =</span> lambda)) <span class="sc">+</span></span>
+<span id="cb63-25"><a href="#cb63-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_tile</span>(<span class="at">color =</span> <span class="st">"white"</span>) <span class="sc">+</span></span>
+<span id="cb63-26"><a href="#cb63-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_viridis_c</span>(<span class="at">name =</span> <span class="st">"Expected</span><span class="sc">\n</span><span class="st">Cases"</span>, <span class="at">option =</span> <span class="st">"C"</span>) <span class="sc">+</span></span>
+<span id="cb63-27"><a href="#cb63-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Year"</span>, <span class="at">y =</span> <span class="st">"Serotype"</span>, <span class="at">title =</span> <span class="st">"Expected Cases by Year and Serotype"</span>) <span class="sc">+</span></span>
+<span id="cb63-28"><a href="#cb63-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb63-29"><a href="#cb63-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text.y =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">8</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Hierarchical_Modeling_files/figure-html/hierarchical%20modeling%20disease-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb64"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb64-1"><a href="#cb64-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb64-2"><a href="#cb64-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb64-3"><a href="#cb64-3" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(disease_serotype_year_counts, <span class="fu">aes</span>(<span class="at">x =</span> Year, <span class="at">y =</span> Serotype, <span class="at">fill =</span> cases)) <span class="sc">+</span></span>
+<span id="cb64-4"><a href="#cb64-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_tile</span>(<span class="at">color =</span> <span class="st">"white"</span>) <span class="sc">+</span></span>
+<span id="cb64-5"><a href="#cb64-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_viridis_c</span>(<span class="at">option =</span> <span class="st">"C"</span>, <span class="at">name =</span> <span class="st">"Cases"</span>) <span class="sc">+</span></span>
+<span id="cb64-6"><a href="#cb64-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"IPD Cases by Serotype and Year"</span>,</span>
+<span id="cb64-7"><a href="#cb64-7" aria-hidden="true" tabindex="-1"></a>       <span class="at">x =</span> <span class="st">"Year"</span>,</span>
+<span id="cb64-8"><a href="#cb64-8" aria-hidden="true" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">"Serotype"</span>) <span class="sc">+</span></span>
+<span id="cb64-9"><a href="#cb64-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb64-10"><a href="#cb64-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text.x =</span> <span class="fu">element_text</span>(<span class="at">angle =</span> <span class="dv">45</span>, <span class="at">hjust =</span> <span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Hierarchical_Modeling_files/figure-html/hierarchical%20modeling%20disease-3.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb65"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb65-1"><a href="#cb65-1" aria-hidden="true" tabindex="-1"></a><span class="co">#model version</span></span>
+<span id="cb65-2"><a href="#cb65-2" aria-hidden="true" tabindex="-1"></a>mean_year <span class="ot">&lt;-</span> (<span class="fu">max</span>(disease_serotype_year_counts<span class="sc">$</span>year_id) <span class="sc">+</span> <span class="dv">1</span>) <span class="sc">/</span> <span class="dv">2</span></span>
+<span id="cb65-3"><a href="#cb65-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb65-4"><a href="#cb65-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a data frame with expected log lambda for each serotype-year</span></span>
+<span id="cb65-5"><a href="#cb65-5" aria-hidden="true" tabindex="-1"></a>disease_serotype_year_counts<span class="sc">$</span>expected_log_lambda <span class="ot">&lt;-</span> mu_means[disease_serotype_year_counts<span class="sc">$</span>sero_id] <span class="sc">+</span> </span>
+<span id="cb65-6"><a href="#cb65-6" aria-hidden="true" tabindex="-1"></a>  beta_means[disease_serotype_year_counts<span class="sc">$</span>sero_id] <span class="sc">*</span> (disease_serotype_year_counts<span class="sc">$</span>year_id <span class="sc">-</span> mean_year)</span>
+<span id="cb65-7"><a href="#cb65-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb65-8"><a href="#cb65-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Convert to expected cases (lambda)</span></span>
+<span id="cb65-9"><a href="#cb65-9" aria-hidden="true" tabindex="-1"></a>disease_serotype_year_counts<span class="sc">$</span>expected_cases <span class="ot">&lt;-</span> <span class="fu">exp</span>(disease_serotype_year_counts<span class="sc">$</span>expected_log_lambda)</span>
+<span id="cb65-10"><a href="#cb65-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb65-11"><a href="#cb65-11" aria-hidden="true" tabindex="-1"></a><span class="co">#plot</span></span>
+<span id="cb65-12"><a href="#cb65-12" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(disease_serotype_year_counts, <span class="fu">aes</span>(<span class="at">x =</span> Year)) <span class="sc">+</span></span>
+<span id="cb65-13"><a href="#cb65-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">y =</span> cases), <span class="at">color =</span> <span class="st">"blue"</span>, <span class="at">alpha =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
+<span id="cb65-14"><a href="#cb65-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">y =</span> expected_cases, <span class="at">group =</span> Serotype), <span class="at">color =</span> <span class="st">"red"</span>) <span class="sc">+</span></span>
+<span id="cb65-15"><a href="#cb65-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span> Serotype, <span class="at">scales =</span> <span class="st">"free_y"</span>) <span class="sc">+</span></span>
+<span id="cb65-16"><a href="#cb65-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">y =</span> <span class="st">"Cases"</span>, <span class="at">x =</span> <span class="st">"Year"</span>, <span class="at">title =</span> <span class="st">"Observed (points) vs Expected (lines) Cases by Serotype, Disease"</span>) <span class="sc">+</span></span>
+<span id="cb65-17"><a href="#cb65-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb65-18"><a href="#cb65-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text.x =</span> <span class="fu">element_text</span>(<span class="at">angle =</span> <span class="dv">45</span>, <span class="at">hjust =</span> <span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>`geom_line()`: Each group consists of only one observation.
+ℹ Do you need to adjust the group aesthetic?
+`geom_line()`: Each group consists of only one observation.
+ℹ Do you need to adjust the group aesthetic?</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="Hierarchical_Modeling_files/figure-html/hierarchical%20modeling%20disease-4.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
