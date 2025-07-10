@@ -520,6 +520,10 @@ summary(mod3)
 ```
 
 ```{r}
+# Adding a new column for plotting type
+#mergedCarriage2DF.pred.its$LineType <- "Fitted"
+#mergedCarriage2DF.pred.its$Counterfactual <- "Counterfactual"
+
 p1 <- 
   ggplot(mergedCarriage2DF, aes(x = Year, y = CCount)) +
       geom_point(color = "#6A0DAD") +
@@ -554,10 +558,9 @@ mergedCarriage2DF.pred.its <- mergedCarriage2DF %>%
 # Plot the newly created model fitting.
 p4 <- p1 +
   # Add the fitting line.
-  geom_line(data = mergedCarriage2DF.pred.its, aes(x = Year, y = pred), group = 1,
-            color = "#00356B") +
+  geom_line(data = mergedCarriage2DF.pred.its, aes(x = Year, y = pred, color = "Negative Binomial Fitted Line"), size = .7, group = 1) +
   # Add the confidence interval.
-  geom_ribbon(data = mergedCarriage2DF.pred.its, aes( ymin = conf.low, ymax = conf.high), group = 1, alpha = 0.2, fill = "#008080") +
+  geom_ribbon(data = mergedCarriage2DF.pred.its, aes( ymin = conf.low, ymax = conf.high), fill = "#008080", group = 1, alpha = 0.2) +
   # Change the title name.
   labs(title = "Pneumococcal Carriage Infections in Nepal",
        subtitle = "Interrupted Time Series, Negative Binomial Fit")
@@ -575,15 +578,17 @@ mergedCarriage2DF.pred.its$pred4.cf <- predict(mod3, type = "response",
   # Extract fitted value and add to df.pred.
   newdata = mergedCarriage2DF.counterfactual)
 
-#colors <- c("Negative Binomial Fit" = "#00356B", "Confidence Interval" = "#008080"###,"Counterfactual" = "#E69F00")
-
 # Overlay onto plot.
-p4 +
-  geom_line(data = mergedCarriage2DF.pred.its, aes(x = Year, y = pred4.cf),
-           color='#E69F00', lty = 2, group = 1)
-#  scale_color_manual(name = "Group",
-#                     values = c("Negative Binomial Fitted Line" = "#00356B", "Confidence #Interval" = "#008080","Counterfactual" = "#E69F00"),
-#                     labels = c("Negative Binomial Fitted Line", "Confidence Interval", #"Counterfactual"))
+pFinal <- p4 +
+  geom_line(data = mergedCarriage2DF.pred.its, aes(x = Year, y = pred4.cf, color = "Counterfactual"), size = .8, lty = 2, group = 1) +
+  scale_color_manual(name='Legend',
+                     breaks=c('Negative Binomial Fitted Line', 'Counterfactual'),
+                     values=c("Negative Binomial Fitted Line" = "#00356B","Counterfactual" = "#E69F00")) +
+  theme(legend.position = "bottom",
+        legend.text = element_text(size = 12),
+        legend.title = element_blank())
+
+pFinal
 ```
 
 ```{r}
@@ -693,20 +698,34 @@ p7 <-
   ggplot(method3Carriage.pred.spl, aes(x = Year, y = CCount)) +
       geom_point() +
       # Add the fitted line.
-      geom_line(data = method3Carriage.pred.spl, aes(x = Year, y = pred.spl),
-                color = "#00356B", group = 1) +
+      geom_line(data = method3Carriage.pred.spl, aes(x = Year, y = pred.spl, color = "Negative Binomial Fitted Line"), size = .7, group = 1) +
       # Add the confidence interval.
-      geom_ribbon(data = method3Carriage.pred.spl, aes(ymin = conf.low, ymax = conf.high),
-                  alpha = 0.2, fill = "#008080", group = 1) +
+      geom_ribbon(data = method3Carriage.pred.spl, aes(ymin = conf.low, ymax = conf.high), fill = "#008080",
+                  alpha = 0.2, group = 1) +
       # Add the counterfactual line.
-      geom_line(data = method3Carriage.pred.spl, aes(x = Year, y = pred.spl.cf),
-                color = "#E69F00", lty = 2, group = 1) +
-      labs(title = "Pneomoccocal Carriage Infections\nNegative Binomial Fit, Interrupted Time Series with Spline Smoothing",
+      geom_line(data = method3Carriage.pred.spl, aes(x = Year, y = pred.spl.cf, color = "Counterfactual"), size = .8,
+         lty = 2, group = 1) +
+      labs(title = "Pneomoccocal Carriage Infections in Nepal",
+      subtitle = "Negative Binomial Fit,\nInterrupted Time Series with Spline Smoothing",
          x = "Year", y = "Counts") +
       theme_linedraw() +
+    scale_color_manual(name='Legend',
+                     breaks=c('Negative Binomial Fitted Line', 'Counterfactual'),
+                     values=c("Negative Binomial Fitted Line" = "#00356B","Counterfactual" = "#E69F00")) +
       # Specify aspects of the theme plot formatting settings.
       theme(panel.spacing = unit(2, 'lines'), 
-            axis.text.x = element_text(angle = 90))
+            axis.text.x = element_text(angle = 0, size = 12),
+            axis.text.y = element_text(size = 12),
+            axis.title = element_text(size = 12),
+            axis.title.x = element_text(size = 14),
+            axis.title.y =element_text(size = 14),
+            title = element_text(size = 18),
+            legend.position = "bottom",
+        legend.title = element_blank(),
+        legend.text = element_text(size = 12)) +
+      scale_x_continuous(breaks = seq(floor(min(method3Carriage.pred.spl$Year)), 
+                                  ceiling(max(method3Carriage.pred.spl$Year)), 
+                                  by = 1))
 
 p7
 # use subtitle
@@ -783,19 +802,29 @@ p_m3 <-
       geom_point() +
       # Add the fitted line.
       geom_line(data = method3Carriage.pred.pre, aes(x = Year, y = pred),
-                color = "#377eb8") +
+                color = "#00356B") +
       # Add the confidence interval.
       geom_ribbon(data = method3Carriage.pred.pre, aes(ymin = conf.low, ymax = conf.high),
-                  alpha = 0.2, fill = "blue") +
-      labs(title = "Deaths with a Negative Binomial Fit\nExtrapolating Based on the Pre-Vaccine Period",
-         x = "Date", y = "Counts for <5 yo") +
-      theme_linedraw()
-
+                  alpha = 0.2, fill = "#008080") +
+      labs(title = "Pneomococcal Carriage Infections",
+           subtitle = "Negative Binomial Fit,\nExtrapolating Based on the Pre-Vaccine Period",
+         x = "Year", y = "Counts") +
+      theme_linedraw() +
+    scale_x_continuous(breaks = seq(floor(min(method3Carriage.pred.pre$Year)), 
+                                  ceiling(max(method3Carriage.pred.pre$Year)), 
+                                  by = 1)) +
+        theme(panel.spacing = unit(2, 'lines'), 
+            axis.text.x = element_text(angle = 0, size = 12),
+            axis.text.y = element_text(size = 12),
+            axis.title = element_text(size = 12),
+            axis.title.x = element_text(size = 14),
+            axis.title.y =element_text(size = 14),
+            title = element_text(size = 18))
 p_m3
 ```
 
 ```{r}
-ds.pred.mod5$rr.trend<-method3Carriage$CCount/ds.pred.mod5$pred.mod5
+ds.pred.mod5$rr.trend<-method3Carriage$CCount/ method3Carriage.pred.mod5$pred.mod5
 ```
 
 ```{r}
@@ -822,3 +851,226 @@ round(c('ITS'=rr.its.eval,'Spline'=rr.spline.eval,'Trend Extrapolation'=rr.trend
 ```
 
 One of the modeling methods identified a decrease of approximately 73% in pneumonia deaths due to pneumococcal disease after the release of the PCV10 vaccine and one identified a 99% decrease. The extrapolation method indicates a weaker vaccine effect; however, we expect some of this result to be spurious due to the level of random noise introduced by applying the observed values in the counterfactual ratio calculation.
+
+```{r}
+mergedCarriage2DF.pred.its$rr.its.a <- mergedCarriage2DF.pred.its$pred/mergedCarriage2DF.pred.its$pred4.cf.a
+
+```
+
+```{r}
+p_ratio <- 
+  ggplot(df.pred.its, aes(x = date, y = rr.its.a)) +
+      geom_line() +
+      labs(title = "Rate Ratio of the ITS Model",
+         x = "Date", y = "Rate ratio") +
+      ylim(0, NA) +
+      geom_vline(xintercept = vax.intro.date, col = "red", lty = 2) +
+      annotate("text", x = vax.intro.date + 30, y = 00.1, label = "Vaccine Introduced", color = "red", hjust = 0) +
+      theme_linedraw()
+
+p_ratio +
+  geom_line(data = df.pred.its, aes(x = date, y = rr.its.b),
+            color = "#4daf4a")
+```
+
+```{r}
+# Inspect methods sensitivity to vaccine impact.
+p_ratio <- 
+  ggplot(df.pred.its, aes(x = date, y = rr.its.a)) +
+      geom_line() +
+      labs(title = "Rate Ratio of the ITS Model",
+         x = "Date", y = "Rate ratio") +
+      ylim(0, NA) +
+      geom_vline(xintercept = vax.intro.date, col = "red", lty = 2) +
+      annotate("text", x = vax.intro.date + 30, y = 00.1, label = "Vaccine Introduced", color = "red", hjust = 0) +
+      theme_linedraw()
+
+p_ratio +
+  geom_line(data = df.pred.its, aes(x = date, y = rr.its.b),
+            color = "#4daf4a")
+```
+
+```{r}
+p6 <- 
+  ggplot(mergedCarriage2DF.pred.its, aes(x = Year, y = rr.its)) +
+      geom_line(group = 1) +
+      labs(title = "Rate Ratio Between Model and Counterfactual",
+         x = "Year", y = "Rate ratio") +
+      theme_linedraw() +
+      # Specify aspects of the theme plot formatting settings.
+      theme(panel.spacing = unit(2, 'lines'), 
+            axis.text.x = element_text(angle = 90)) +
+      geom_hline(yintercept = 1, col = "#999999", lty = 2) + 
+     geom_line(data = method3Carriage.pred.spl, aes(x = Year, y = rr.spline),
+               color = "#E69F00", lty = 2) + 
+      # Update the title.
+      labs(title = "Rate Ratio with the Spline Model")
+
+p6
+```
+
+```{r}
+mergedCarriage2DF.pred.its$Year <- as.numeric(mergedCarriage2DF.pred.its$Year)
+method3Carriage.pred.spl$Year <- as.numeric(method3Carriage.pred.spl$Year)
+
+p6 <- ggplot() +
+  geom_line(data = mergedCarriage2DF.pred.its, 
+            aes(x = Year, y = rr.its, color = "Interrupted Time Series Model", group = 1), 
+            linetype = "solid", size = 1.2) +
+  geom_line(data = method3Carriage.pred.spl, 
+            aes(x = Year, y = rr.spline, color = "Spline Model", group = 1), size = 1.2) +
+  geom_hline(yintercept = 1, color = "grey20", lty = 2) +
+  
+  geom_vline(xintercept = 2015, color = "red", linetype = "dashed", size = .8) +
+  
+  labs(title = "Rate Ratios of Interrupted Time Series and Spline Model",
+       x = "Year", y = "Rate Ratio", color = "Model") +
+  theme_linedraw() +
+  theme(panel.spacing = unit(2, 'lines'), 
+        axis.text.x = element_text(angle = 90)) +
+  scale_color_manual(values = c("Interrupted Time Series Model" = "#6A0DAD", "Spline Model" = "#008080")) +
+  scale_x_continuous(breaks = seq(floor(min(mergedCarriage2DF.pred.its$Year)), 
+                                  ceiling(max(mergedCarriage2DF.pred.its$Year)), 
+                                  by = 1)) +
+  theme(panel.spacing = unit(2, 'lines'),
+        legend.position = "bottom",
+        legend.title = element_blank(),
+         axis.text.x = element_text(angle = 0, size = 12),
+            axis.text.y = element_text(size = 12),
+            axis.title = element_text(size = 12),
+            axis.title.x = element_text(size = 14),
+            axis.title.y =element_text(size = 14),
+            title = element_text(size = 15),
+        legend.text = element_text(size = 12)) +
+        annotate("text", x = 2015.15, y = 00.1, label = "Vaccine Introduced", color = "red", hjust = 0)
+
+
+p6
+```
+
+Trying method three again
+
+```{r}
+# Create a new variable where it is J12_J18_prim until the vaccine is introduced,
+# then it is NA afterwards.
+
+method3Carriage$CCountPre <- method3Carriage$CCount
+
+method3Carriage$CCountPre[which(method3Carriage$Year >= 2016)] <- NA
+
+# Inspect the changes.
+method3Carriage[sort(sample(1:6, 6)), c("Year", "CCountPre")]
+```
+
+```{r}
+mod_method3 <- glm.nb(CCountPre ~ index + offset(log.offset), data = method3Carriage)
+
+# Add the prediction using the smoothed model.
+method3Carriage.pred.pre <- method3Carriage %>%
+  mutate(pred.pre = predict(mod_method3, type = "response", newdata = method3Carriage))
+```
+
+```{r}
+method3Carriage.pred.pre$rr.trend <- method3Carriage$CCount/method3Carriage.pred.pre$pred.pre
+
+```
+
+```{r}
+## --------------------
+## Prepare a plot to visualize the factual model predictions
+
+# Make predictions with confidence intervals.
+pred7 <- predict(mod_method3, type = "response", se.fit = TRUE, newdata = method3Carriage)
+
+# Add the model predictions and 95% COI to the dataframe.
+method3Carriage.pred.pre <- method3Carriage.pred.pre %>%
+  mutate(se.fit = pred7$se.fit, pred = pred7$fit) %>%
+  mutate(
+    conf.low = pred - 1.96 * se.fit,
+    conf.high = pred + 1.96 * se.fit
+  )
+
+
+p_m3 <- 
+  ggplot(method3Carriage.pred.pre, aes(x = Year, y = CCount)) +
+      geom_point() +
+      # Add the fitted line.
+      geom_line(data = method3Carriage.pred.pre, aes(x = Year, y = pred.pre),
+                color = "#377eb8") +
+      # Add the confidence interval.
+      geom_ribbon(data = method3Carriage.pred.pre, aes(ymin = conf.low, ymax = conf.high),
+                  alpha = 0.2, fill = "blue") +
+      labs(title = "Deaths with a Negative Binomial Fit\nExtrapolating Based on the Pre-Vaccine Period",
+         x = "Year", y = "Counts") +
+      theme_linedraw()
+
+p_m3
+```
+
+```{r}
+p_ratio <- p6 +
+  geom_line(data = method3Carriage.pred.pre, aes(x = Year, y = rr.trend),
+            color = '#377eb8', size = 1.2) +
+  # Update the title.
+  labs(title = "Rate Ratio with the Extrapolation Model")
+
+p_ratio
+```
+
+```{r}
+# Create a Boolean variable that defines the vaccine evaluation period.
+eval.period <- method3Carriage$Year > 2015
+eval.period2 <- mergedCarriage2DF$Year > 2015
+
+# Calculate the average outcome during the vaccine evaluation period.
+rr.its.eval    <- mean(mergedCarriage2DF.pred.its$rr.its[eval.period2])
+rr.spline.eval <- mean(method3Carriage.pred.spl$rr.spline[eval.period])
+rr.trend.eval  <- sum(method3Carriage.pred.pre$CCount[eval.period])/sum(method3Carriage.pred.pre$pred.pre[eval.period])
+
+# Average decline detected from 1.
+round(c("ITS - Disconnected" = rr.its.eval, "ITS - Spline" = rr.spline.eval,
+        "Extrapolation" = rr.trend.eval), digits = 2)
+```
+
+```{r}
+# Percent decline detected.
+100*(1 - round(c("ITS - Disconnected" = rr.its.eval, "ITS - Spline" = rr.spline.eval, 
+                 "Extrapolation" = rr.trend.eval), digits = 2))
+```
+
+```{r}
+p6 <- ggplot() +
+  geom_line(data = mergedCarriage2DF.pred.its, 
+            aes(x = Year, y = rr.its, color = "Interrupted Time Series Model", group = 1), 
+            linetype = "solid", size = 1.2) +
+  geom_line(data = method3Carriage.pred.spl, 
+            aes(x = Year, y = rr.spline, color = "Spline Model", group = 1), size = 1.2) +
+  geom_line(data = method3Carriage.pred.pre, aes(x = Year, y = rr.trend, color = 'Extrapolation Model', group = 1),
+             size = 1.2) +
+  geom_hline(yintercept = 1, color = "grey20", lty = 2) +
+  
+  geom_vline(xintercept = 2015, color = "red", linetype = "dashed", size = .8) +
+  
+  labs(title = "Rate Ratios of Interrupted Time Series, Spline,\nand Extrapolation Models",
+       x = "Year", y = "Rate Ratio", color = "Model") +
+  theme_linedraw() +
+  theme(panel.spacing = unit(2, 'lines'), 
+        axis.text.x = element_text(angle = 90)) +
+  scale_color_manual(values = c("Interrupted Time Series Model" = "#6A0DAD", "Spline Model" = "#008080", "Extrapolation Model" = "#E69F00")) +
+  scale_x_continuous(breaks = seq(floor(min(mergedCarriage2DF.pred.its$Year)), 
+                                  ceiling(max(mergedCarriage2DF.pred.its$Year)), 
+                                  by = 1)) +
+  theme(panel.spacing = unit(2, 'lines'),
+        legend.position = "bottom",
+        legend.title = element_blank(),
+         axis.text.x = element_text(angle = 0, size = 12),
+            axis.text.y = element_text(size = 12),
+            axis.title = element_text(size = 12),
+            axis.title.x = element_text(size = 14),
+            axis.title.y =element_text(size = 14),
+            title = element_text(size = 15),
+        legend.text = element_text(size = 12)) +
+        annotate("text", x = 2015.15, y = 00.1, label = "Vaccine Introduced", color = "red", hjust = 0)
+
+p6
+```

@@ -6,9 +6,10 @@ editor: visual
 
 ```{r loading files}
 library(tidyverse)
+library(dplyr)
 nepal <- read.csv("nepal.csv")
 nepal_gps <- read.csv("nepal_gps.csv")
-pcv10serotypes <- c('1', '4', '5', '6B', '7F', '9V', '14', '18C', '19F', '23F') 
+pcv10_serotypes <- c('1', '4', '5', '6B', '7F', '9V', '14', '18C', '19F', '23F') 
 pcv13_serotypes <- c('3', '6A', '19A')
 pcv15_serotypes <- c('22F', '33F')
 pcv20_serotypes <- c('8', '10A', '11A', '12F', '15B')
@@ -20,7 +21,7 @@ Introductory work:
 # getting data ready for plotting
 nepal_plot_data <- nepal %>%
   # select serotype + year columns
-  select(Serotype, X2014n, X2015n, X2017n, X2018n, X2019n, X2021n) %>%
+  dplyr::select(Serotype, X2014n, X2015n, X2017n, X2018n, X2019n, X2021n) %>%
   # format data frame
   pivot_longer(cols = -Serotype,
                names_to = "Year",
@@ -41,7 +42,7 @@ ggplot(data = nepal_plot_data, aes(x = as.numeric(Year), y = Count, color = Sero
 # getting data ready for plotting
 nepal_plot_data_PCV10 <- nepal %>%
   # select serotype + year columns
-  select(Serotype, X2014n, X2015n, X2017n, X2018n, X2019n, X2021n) %>%
+  dplyr::select(Serotype, X2014n, X2015n, X2017n, X2018n, X2019n, X2021n) %>%
   # format data frame
   pivot_longer(cols = -Serotype,
                names_to = "Year",
@@ -62,7 +63,7 @@ ggplot(data = nepal_plot_data_PCV10, aes(x = as.numeric(Year), y = Count, color 
 # getting data ready for plotting
 nepal_plot_data_prop <- nepal %>%
   # select serotype + year columns
-  select(Serotype, X2014p, X2015p, X2017p, X2018p, X2019p, X2021p) %>%
+  dplyr::select(Serotype, X2014p, X2015p, X2017p, X2018p, X2019p, X2021p) %>%
   # format data frame
   pivot_longer(cols = -Serotype,
                names_to = "Year",
