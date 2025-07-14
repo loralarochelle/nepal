@@ -39,3 +39,25 @@ ggplot(data=nepal_serotype_counts, aes(x=Year, y=count, color=Serotype_group)) +
   facet_grid(Disease_Status ~ .)+
   labs(title="Pneumococcal Disease Prevalence by Serotype Group over Time")+
   theme_bw()
+
+
+ggplot(nepal_serotype_props, aes(x = Year, y = prop, color = Serotype_group)) +
+  geom_line() +
+  geom_point() +
+  facet_grid(Disease_Status ~ .) +
+  scale_color_manual(values = custom_colors) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  labs(
+    title = "Proportion of Pneumococcal Serotype Groups by Year",
+    y = "Proportion of Cases",
+    x = "Year",
+    color = "Serotype Group"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    strip.text = element_text(size = 12)
+  )
+
