@@ -1,5 +1,5 @@
 ---
-title: "Basic Plots"
+title: "Serotype Trend Plots"
 format: html
 editor: visual
 ---
@@ -13,6 +13,87 @@ pcv10_serotypes <- c('1', '4', '5', '6B', '7F', '9V', '14', '18C', '19F', '23F')
 pcv13_serotypes <- c('3', '6A', '19A')
 pcv15_serotypes <- c('22F', '33F')
 pcv20_serotypes <- c('8', '10A', '11A', '12F', '15B')
+```
+
+Negative Binomial fit stuff
+
+```{r neg binomial fit}
+df <- read.csv("nepal.csv")
+df.gps <- read.csv("nepal_gps.csv")
+df.gps <- df.gps %>%
+  filter(Year >= 2009) %>%
+  filter(In_silico_serotype != "ALTERNATIVE_ALIB_NT" & 
+           In_silico_serotype != "SWISS_NT" &
+           In_silico_serotype != "COVERAGE TOO LOW" &
+           In_silico_serotype != "UNTYPABLE") %>%
+  mutate(Disease_Status = ifelse(Clinical_manifestation == "CARRIAGE", 
+                                 "Carriage", "Disease"))
+pcv10_serotypes <- c('1', '4', '5', '6B', '7F', '9V', '14', '18C', '19F', '23F')
+pcv13_serotypes <- c('3', '6A', '19A')
+pcv15_serotypes <- c('22F', '33F')
+pcv20_serotypes <- c('8', '10A', '11A', '12F', '15B')
+df.gps$Serotype_group <- ifelse(
+  df.gps$In_silico_serotype %in% pcv10_serotypes, "PCV10",
+  ifelse(df.gps$In_silico_serotype %in% pcv13_serotypes, "PCV13",
+  ifelse(df.gps$In_silico_serotype %in% pcv15_serotypes, "PCV15",
+  ifelse(df.gps$In_silico_serotype %in% pcv20_serotypes, "PCV20",
+  "OTHER"))))
+
+df.gps2 <- df.gps %>%
+  filter(Year >= 2009) %>%
+  mutate(Disease_Status = ifelse(Clinical_manifestation == "CARRIAGE", "Carriage", "Disease")) %>%
+  group_by(Year, Disease_Status) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(Disease_Status)
+p1 <- ggplot(df.gps2, aes(x = Year, y = count, color=Disease_Status)) +
+      geom_line() +
+      geom_point() +
+      labs(title = "Cases of Pneumococcal Disease in Nepal Over time",
+        x = "Year", y = "Count") +
+      geom_vline(xintercept = 2015, col = 'red', lty = 2) +
+      theme_linedraw()
+p1
+df.gps2 <- tibble::rownames_to_column(df.gps2, var = "index") %>%
+  mutate(index = as.numeric(index))
+
+df.gps.carriage <- df.gps2 %>%
+  filter(Disease_Status == "Carriage")
+mod.carriage <- glm.nb(data = df.gps.carriage, count ~ index)
+pred.carriage <- predict(mod.carriage, type = "response", se.fit = TRUE)
+df.pred.carriage <- df.gps.carriage %>%
+  mutate(se.fit = pred.carriage$se.fit, 
+         pred.carriage = pred.carriage$fit) %>%
+  mutate(conf.low.carriage = pred.carriage - 1.96 * se.fit,
+         conf.high.carriage = pred.carriage + 1.96 * se.fit)
+
+df.gps.disease <- df.gps2 %>%
+  filter(Disease_Status == "Disease")
+mod.disease <- glm.nb(data = df.gps.disease, count ~ index)
+pred.disease <- predict(mod.disease, type = "response", se.fit = TRUE)
+df.pred.disease <- df.gps.disease %>%
+  mutate(se.fit = pred.disease$se.fit, 
+         pred.disease = pred.disease$fit) %>%
+  mutate(conf.low.disease = pred.disease - 1.96 * se.fit,
+         conf.high.disease = pred.disease + 1.96 * se.fit)
+
+p1a <- p1 +
+  geom_line(data = df.pred.carriage, 
+            aes(x = Year, y = pred.carriage),
+            color = "red") +
+  geom_ribbon(data = df.pred.carriage, 
+              aes(ymin = conf.low.carriage, 
+                  ymax = conf.high.carriage), 
+              alpha = 0.2, fill = "blue") +
+  geom_line(data = df.pred.disease, 
+            aes(x = Year, y = pred.disease),
+            color = "blue") +
+  geom_ribbon(data = df.pred.disease, 
+              aes(ymin = conf.low.disease, 
+                  ymax = conf.high.disease), 
+              alpha = 0.2, fill = "lightblue") +
+  labs(title = "Negative Binomial Fit of Pneumococcal Trends in Nepal")+
+  theme(plot.title = element_text(face="bold"))
+p1a
 ```
 
 Introductory work:
@@ -96,6 +177,7 @@ nepal_shortened$Serotype_group <- ifelse(
   ifelse(nepal_shortened$In_silico_serotype %in% pcv13_serotypes, "PCV13",
   ifelse(nepal_shortened$In_silico_serotype %in% pcv15_serotypes, "PCV15",
   ifelse(nepal_shortened$In_silico_serotype %in% pcv20_serotypes, "PCV20", "Other"))))
+View(nepal_shortened)
 
 # Assign Disease vs Carriage
 nepal_shortened <- nepal_shortened %>%
@@ -116,26 +198,29 @@ nepal_serotype_props <- nepal_serotype_counts %>%
 # Define custom color palette
 custom_colors <- c(
   "PCV10" = "#00356B",   # Yale Blue
-  "PCV13" = "#6A0DAD",   # Purple
-  "PCV15" = "#008080",   # Teal
-  "PCV20" = "#E69F00",   # Gold
-  "Other" = "#999999"    # Grey fallback
+  "Additional PCV13" = "#6A0DAD",   # Purple
+  "Additional PCV15" = "#008080",   # Teal
+  "Additional PCV20" = "#E69F00",   # Gold
+  "Non-PCV" = "#999999"    # Grey fallback
 )
 
-# === Original count plot ===
-ggplot(nepal_serotype_counts, aes(x = Year, y = count, color = Serotype_group)) +
-  geom_line() +
-  geom_point() +
-  facet_grid(Disease_Status ~ .) +
-  scale_color_manual(values = custom_colors) +
-  labs(
-    title = "Pneumococcal Disease Prevalence in Nepal\nby Serotype Group Over Time",
-    y = "Case Count",
-    x = "Year",
-    color = "Serotype Group"
-  ) +
-  theme_bw() +
-  theme(plot.title = element_text(face = "bold", size = 14))
+nepal_serotype_props <- nepal_serotype_props %>%
+  mutate(
+    Serotype_group = recode(Serotype_group,
+      "PCV10" = "PCV10",
+      "PCV13" = "Additional PCV13",
+      "PCV15" = "Additional PCV15",
+      "PCV20" = "Additional PCV20",
+      "Other" = "Non-PCV"
+    ),
+    Serotype_group = factor(Serotype_group, levels = c(
+      "PCV10",
+      "Additional PCV13",
+      "Additional PCV15",
+      "Additional PCV20",
+      "Non-PCV"
+    ))
+  )
 
 # === New proportion plot ===
 ggplot(nepal_serotype_props, aes(x = Year, y = prop, color = Serotype_group)) +
@@ -155,5 +240,7 @@ ggplot(nepal_serotype_props, aes(x = Year, y = prop, color = Serotype_group)) +
     plot.title = element_text(face = "bold", size = 14),
     strip.text = element_text(size = 12),
     axis.title = element_text(size = 11)
-  )
+  ) -> props
+props
+ggsave("propsplot.png", plot=props, width=7, height=6)
 ```

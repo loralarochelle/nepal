@@ -706,10 +706,16 @@ p7 <-
       geom_ribbon(data = method3Carriage.pred.spl, aes(ymin = conf.low, ymax = conf.high), fill = "#008080",
                   alpha = 0.2, group = 1) +
       # Add the counterfactual line.
+<<<<<<< HEAD
       geom_line(data = method3Carriage.pred.spl, aes(x = Year, y = pred.spl.cf, color = "Counterfactual"), size = .8,
          lty = 2, group = 1) +
       labs(title = "Pneumoccocal Carriage Infections in Nepal",
       subtitle = "Negative Binomial Fit,\nInterrupted Time Series with Spline Smoothing",
+=======
+      geom_line(data = method3Carriage.pred.spl, aes(x = Year, y = pred.spl.cf),
+                color = "#E69F00", lty = 2, group = 1) +
+      labs(title = "Pneumoccocal Carriage Infections\nNegative Binomial Fit, Interrupted Time Series with Spline Smoothing",
+>>>>>>> 59e0465ad39c136a7ef6f6e1e4954791c940a2c3
          x = "Year", y = "Counts") +
       theme_linedraw() +
     geom_vline(xintercept = 2015, color = "red", linetype = "dashed", size = .8) +
@@ -733,7 +739,7 @@ p7 <-
                                   by = 1)) +
                                  annotate("text", x = 2015.15, y = 00.1, label = "Vaccine Introduced", color = "red", hjust = 0)
 
-p7
+ggsave("p7.jpeg", plot=p7, width=6, height=4)
 # use subtitle
 # angles years
 ```
