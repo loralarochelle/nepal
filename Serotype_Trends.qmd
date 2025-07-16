@@ -176,6 +176,7 @@ nepal_shortened$Serotype_group <- ifelse(
   ifelse(nepal_shortened$In_silico_serotype %in% pcv13_serotypes, "PCV13",
   ifelse(nepal_shortened$In_silico_serotype %in% pcv15_serotypes, "PCV15",
   ifelse(nepal_shortened$In_silico_serotype %in% pcv20_serotypes, "PCV20", "Other"))))
+View(nepal_shortened)
 
 # Assign Disease vs Carriage
 nepal_shortened <- nepal_shortened %>%
@@ -196,37 +197,29 @@ nepal_serotype_props <- nepal_serotype_counts %>%
 # Define custom color palette
 custom_colors <- c(
   "PCV10" = "#00356B",   # Yale Blue
-  "PCV13" = "#6A0DAD",   # Purple
-  "PCV15" = "#008080",   # Teal
-  "PCV20" = "#E69F00",   # Gold
-  "Other" = "#999999"    # Grey fallback
+  "Additional PCV13" = "#6A0DAD",   # Purple
+  "Additional PCV15" = "#008080",   # Teal
+  "Additional PCV20" = "#E69F00",   # Gold
+  "Non-PCV" = "#999999"    # Grey fallback
 )
 
-# === Original count plot ===
-ggplot(nepal_serotype_counts, aes(x = Year, y = count, color = Serotype_group)) +
-  geom_line() +
-  geom_point() +
-  facet_grid(Disease_Status ~ .) +
-  scale_color_manual(values = custom_colors) +
-  labs(title = "Pneumococcal Disease Prevalence in Nepal\nby Serotype Group Over Time", y = "Case Count", x = "Year", color = "Serotype Group") +
-  theme_bw() +
-  theme(plot.title = element_text(face = "bold", size = 14))
-
-# Set proper factor levels for ordered PCV groups
-pcv_levels <- c("PCV10", "PCV13 (non-PCV10)", "PCV15 (non_PCV13)", "PCV20")
 nepal_serotype_props <- nepal_serotype_props %>%
-  mutate(Serotype_group = factor(Serotype_group, levels = c(pcv_levels, "Other")))
-
-# Compute cumulative proportions only for PCV groups
-nepal_cumulative_props <- nepal_serotype_props %>%
-  arrange(Year, Disease_Status, Serotype_group) %>%
-  group_by(Year, Disease_Status) %>%
   mutate(
-    cum_prop = if_else(
-      Serotype_group %in% pcv_levels,
-      cumsum(if_else(Serotype_group %in% pcv_levels, prop, 0)),
-      prop)) %>%
-  ungroup()
+    Serotype_group = recode(Serotype_group,
+      "PCV10" = "PCV10",
+      "PCV13" = "Additional PCV13",
+      "PCV15" = "Additional PCV15",
+      "PCV20" = "Additional PCV20",
+      "Other" = "Non-PCV"
+    ),
+    Serotype_group = factor(Serotype_group, levels = c(
+      "PCV10",
+      "Additional PCV13",
+      "Additional PCV15",
+      "Additional PCV20",
+      "Non-PCV"
+    ))
+  )
 
 # === New proportion plot ===
 ggplot(nepal_serotype_props, aes(x = Year, y = prop, color = Serotype_group)) +
@@ -247,22 +240,6 @@ ggplot(nepal_serotype_props, aes(x = Year, y = prop, color = Serotype_group)) +
     strip.text = element_text(size = 12),
     axis.title = element_text(size = 11)
   ) -> props
-
-# CUM SUM ONE
-ggplot(nepal_cumulative_props, aes(x = Year, y = cum_prop, color = Serotype_group)) +
-  geom_line() +
-  geom_point() +
-  facet_grid(Disease_Status ~ .) +
-  scale_color_manual(values = custom_colors) +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-  labs(title = "Proportion of Pneumococcal Infecton \nSerotype Groups by Year in Nepal",
-    y = "Proportion of Cases",
-    x = "Year",
-    color = "Serotype Group") +
-  theme_linedraw() +
-  theme(plot.title = element_text(face = "bold", size = 14),
-    strip.text = element_text(size = 12),
-    axis.title = element_text(size = 11)) -> cumprops
+props
 ggsave("propsplot.png", plot=props, width=7, height=6)
-ggsave("cumpropsplot.png", plot=cumprops, width=7, height=6)
 ```
