@@ -581,12 +581,15 @@ mergedCarriage2DF.pred.its$pred4.cf <- predict(mod3, type = "response",
 # Overlay onto plot.
 pFinal <- p4 +
   geom_line(data = mergedCarriage2DF.pred.its, aes(x = Year, y = pred4.cf, color = "Counterfactual"), size = .8, lty = 2, group = 1) +
+      geom_vline(xintercept = 2015, color = "red", linetype = "dashed", size = .8) +
+
   scale_color_manual(name='Legend',
                      breaks=c('Negative Binomial Fitted Line', 'Counterfactual'),
                      values=c("Negative Binomial Fitted Line" = "#00356B","Counterfactual" = "#E69F00")) +
   theme(legend.position = "bottom",
         legend.text = element_text(size = 12),
         legend.title = element_blank())
+
 
 pFinal
 ```
@@ -705,10 +708,12 @@ p7 <-
       # Add the counterfactual line.
       geom_line(data = method3Carriage.pred.spl, aes(x = Year, y = pred.spl.cf, color = "Counterfactual"), size = .8,
          lty = 2, group = 1) +
-      labs(title = "Pneomoccocal Carriage Infections in Nepal",
+      labs(title = "Pneumoccocal Carriage Infections in Nepal",
       subtitle = "Negative Binomial Fit,\nInterrupted Time Series with Spline Smoothing",
          x = "Year", y = "Counts") +
       theme_linedraw() +
+    geom_vline(xintercept = 2015, color = "red", linetype = "dashed", size = .8) +
+
     scale_color_manual(name='Legend',
                      breaks=c('Negative Binomial Fitted Line', 'Counterfactual'),
                      values=c("Negative Binomial Fitted Line" = "#00356B","Counterfactual" = "#E69F00")) +
@@ -725,7 +730,8 @@ p7 <-
         legend.text = element_text(size = 12)) +
       scale_x_continuous(breaks = seq(floor(min(method3Carriage.pred.spl$Year)), 
                                   ceiling(max(method3Carriage.pred.spl$Year)), 
-                                  by = 1))
+                                  by = 1)) +
+                                 annotate("text", x = 2015.15, y = 00.1, label = "Vaccine Introduced", color = "red", hjust = 0)
 
 p7
 # use subtitle
@@ -806,7 +812,7 @@ p_m3 <-
       # Add the confidence interval.
       geom_ribbon(data = method3Carriage.pred.pre, aes(ymin = conf.low, ymax = conf.high),
                   alpha = 0.2, fill = "#008080") +
-      labs(title = "Pneomococcal Carriage Infections",
+      labs(title = "Pneumococcal Carriage Infections",
            subtitle = "Negative Binomial Fit,\nExtrapolating Based on the Pre-Vaccine Period",
          x = "Year", y = "Counts") +
       theme_linedraw() +
