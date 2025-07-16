@@ -14,9 +14,11 @@ sample_isolates$Serotype_Group <- ifelse(sample_isolates$In_silico_serotype %in%
                                                  ifelse(sample_isolates$In_silico_serotype %in% pcv20_serotypes, "PCV20", 
                                                         ifelse(sample_isolates$In_silico_serotype %in% untypable, "UNTYPABLE",
                                                                "Other")))))
-sample_isolates$PCV_Period <- ifelse(sample_isolates$Vaccine_period == "PREPCV", "PREPCV", "POSTPCV")
+sample_isolates$`PCV Period` <- ifelse(sample_isolates$Vaccine_period == "PREPCV", "Pre-PCV10", "Post-PCV10")
 sample_isolates <- sample_isolates %>%
-  select(Public_name, Age_years, Clinical_manifestation, PCV_Period, GPSC, WGS_PEN_SIR_Meningitis, Cot, folA_I100L, cat, macrolide_resistant, Serotype_Group)
+  dplyr::select(Public_name, Age_years, Clinical_manifestation, `PCV Period`, GPSC, WGS_PEN_SIR_Meningitis, Cot, folA_I100L, cat, macrolide_resistant, Serotype_Group)
+sample_isolates$`Manifestation` <- ifelse(sample_isolates$Clinical_manifestation == "CARRIAGE", "Carriage", "Disease")
+  
 cols_to_change1 <- c("Cot", "folA_I100L", "cat")
 for (col in cols_to_change1) {
   sample_isolates[[col]] <- ifelse(sample_isolates[[col]] == "POS",
