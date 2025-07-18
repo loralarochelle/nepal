@@ -55,11 +55,9 @@ NonPCVForOffset <- NONPCVforGPS %>%
 ```
 
 
-
 ```{r}
 # Adding a new column that will be whether or not the serotype was in pcv10 or not
 GpsShortened$PCV10_group <- ifelse(GpsShortened$In_silico_serotype %in% pcv10Serotypes1,"PCV10", "Non-PCV10")
-
 
 # Selecting only pcv10
 pcv10GpsCarriage <- GpsShortened[GpsShortened$PCV10_group == "PCV10", ]
@@ -306,6 +304,8 @@ mod2 <- glm.nb(CCount ~ index  + offset(log.offset) +
                  spl1 + spl2, data = method22)
 
 summary(mod2)
+
+# Count of carriage cases = index + log offset + index starting at vaccine introduction year + index starting at vaccine evaluation year
 ```
 
 ```{r}
@@ -363,7 +363,7 @@ p_m2 <-
                 lty = 2, group = 1, size = .8)  +
   labs(title = "Time Series Analysis - Pneumococcal Carriage Infections",
       subtitle = "Negative Binomial Fit, Interrupted Time Series with Spline Smoothing",
-         x = "Year", y = "Counts") +
+         x = "Year", y = "Cases") +
       theme_linedraw() +
   geom_vline(xintercept = 2015, color = "red", linetype = "dashed", size = .8) +
 
@@ -394,7 +394,7 @@ p_m2 <-
   annotate("text", x = 2015.15, y = 00.1, label = "Vaccine Introduced", color = "red", hjust = 0)
 
 p_m2
-ggsave(filename="time_series.jpeg", plot=p_m2, width=16, height=10)
+ggsave(filename="time_series.jpeg", plot=p_m2, width=8, height=5)
 ```
 keeping offset as data with the same limitations, tracking the pneumoccocal population overtime
 ```{r}

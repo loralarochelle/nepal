@@ -126,6 +126,11 @@ We have 4093 rules, most are 4 or 5 items long. Let's inspect the top 10 rules a
 
 ```{r}
 inspect(rules[1:10])
+
+sorted_rules <- sort(rules, by = "support", decreasing = TRUE)
+
+# Inspect the top 10 rules by support
+inspect(sorted_rules[1:10])
 ```
 
 And plot these top 10 rules, or 20, or 50.
@@ -169,7 +174,7 @@ summary(rules_b)
 ```
 these more stringent criteria mean that we're down to 115 rules to sort through.
 ```{r}
-inspect(rules_b[1:10])
+inspect(rules_b[3:8])
 ```
 
 try to look for only for rules associated with Carriage
