@@ -250,7 +250,7 @@ ggplot(serotypeProps, aes(x = Serotype, y = proportion, fill = vPeriod)) +
   theme_minimal() +
   scale_fill_manual(
   name = "Vaccine Period",
-  values = c("PREPCV" = "#008080", "POSTPCV" = "#00356B"),
+  values = c("PREPCV" = "#33a1a1", "POSTPCV" = "#00356B"),
   labels = c("PREPCV" = "Pre-PCV", "POSTPCV" = "Post-PCV")
 ) +
   theme(panel.spacing = unit(2, 'lines'),
@@ -259,10 +259,10 @@ ggplot(serotypeProps, aes(x = Serotype, y = proportion, fill = vPeriod)) +
             axis.title = element_text(size = 12),
             axis.title.x = element_text(size = 14),
             axis.title.y =element_text(size = 14),
-            plot.title = element_text(size = 15, face = "bold"),
+            plot.title = element_text(size = 18, face = "bold"),
             plot.subtitle = element_text(size = 14))
-
-ggsave(filename="barChartProps.jpeg", plot = barProps, width=7, height=6)
+barProps
+ggsave(filename="barChartProps.jpeg", plot = barProps, width=8, height=7)
 ```
 
 Trying something
