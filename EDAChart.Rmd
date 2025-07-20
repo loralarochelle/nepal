@@ -243,14 +243,14 @@ serotypeProps$vPeriod <- factor(serotypeProps$vPeriod, levels = c("PREPCV", "POS
 # Plotting
 barProps <- 
 ggplot(serotypeProps, aes(x = Serotype, y = proportion, fill = vPeriod)) +
-  geom_col(position = position_dodge(width = 0.8)) +
+  geom_col(position = position_dodge(width = 0.8), color = "black") +
   labs(title = "Proportions of Pneumococcal Serotypes by Vaccine Period",
        subtitle = "Ordered by Change in Proportion",
        x = "Serotype", y = "Proportion") +
   theme_minimal() +
   scale_fill_manual(
   name = "Vaccine Period",
-  values = c("PREPCV" = "#33a1a1", "POSTPCV" = "#00356B"),
+  values = c("PREPCV" = "#78c2be", "POSTPCV" = "#6A0DAD"),
   labels = c("PREPCV" = "Pre-PCV", "POSTPCV" = "Post-PCV")
 ) +
   theme(panel.spacing = unit(2, 'lines'),

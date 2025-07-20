@@ -5,6 +5,11 @@ date: "2025-07-14"
 ---
 
 ```{r}
+library(ggtext)
+```
+
+
+```{r}
 nepalGps = read.csv("nepal_gps.csv")
 nepalNonGps = read.csv("nepal.csv")
 ```
@@ -306,6 +311,10 @@ mod2 <- glm.nb(CCount ~ index  + offset(log.offset) +
 summary(mod2)
 
 # Count of carriage cases = index + log offset + index starting at vaccine introduction year + index starting at vaccine evaluation year
+
+#index - intro.index + 1
+
+# carriage cases ~ year index + log(offset) + vaccine intro spline + vaccine evaluation spline
 ```
 
 ```{r}
@@ -362,8 +371,12 @@ p_m2 <-
       geom_line(data = method22.pred.spl, aes(x = Year, y = pred.spl.cf, color = "Counterfactual"),
                 lty = 2, group = 1, size = .8)  +
   labs(title = "Time Series Analysis - Pneumococcal Carriage Infections",
-      subtitle = "Negative Binomial Fit, Interrupted Time Series with Spline Smoothing",
-         x = "Year", y = "Cases") +
+      subtitle = paste0(
+    "<span style='font-size:12pt'>Negative Binomial Fit, Interrupted Time Series with Spline Smoothing</span><br>",
+    "<span style='font-size:1pt; color:white'>&nbsp;</span><br>",
+    "<span style='font-size:12pt; color:#6A0DAD'>Carriage Cases ~ Year Index + log(Offset) + Vaccine Intro Spline + Vaccine Eval Spline</span>"
+  ), x = "Year", y = "Cases"
+  ) +
       theme_linedraw() +
   geom_vline(xintercept = 2015, color = "red", linetype = "dashed", size = .8) +
 
@@ -381,8 +394,8 @@ p_m2 <-
             axis.title.x = element_text(size = 14),
             axis.title.y =element_text(size = 14),
             plot.title = element_text(size = 15, face = "bold"),
-            plot.subtitle = element_text(size = 14),
             legend.position = "bottom",
+            plot.subtitle = element_markdown(size = 12),
         legend.title = element_blank(),
         legend.text = element_text(size = 12)) +
     scale_x_continuous(
@@ -396,6 +409,8 @@ p_m2 <-
 p_m2
 ggsave(filename="time_series.jpeg", plot=p_m2, width=8, height=5)
 ```
+
+
 keeping offset as data with the same limitations, tracking the pneumoccocal population overtime
 ```{r}
 # Inspect methods sensitivity to vaccine impact.
