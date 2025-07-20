@@ -169,19 +169,27 @@ adding in a new color scheme
 # Create base plot
 p <- plot(topRules, method = "graph", engine = "htmlwidget")
 
-# Extract rule quality
-rule_teal_colors <- c(
-  "#b2d8d8",  # lift = 1.755556
-  "#b2d8d8",  # lift = 1.755556
-  "#b2d8d8",  # lift = 1.755556
-  "#007a7a",  # lift = 2.972326
-  "#99cfcf",  # lift = 1.396515
-  "#007c7c",  # lift = 2.918284
-  "#8fd1d1",  # lift = 1.370537
-  "#85d4d4",  # lift = 1.342189
-  "#7bd7d7",  # lift = 1.333718
-  "#75d9d9"   # lift = 1.329564
+lift_values <- c(
+  1.755556,
+  1.755556,
+  1.755556,
+  2.972326,
+  2.918284,
+  1.370537,
+  1.339656,
+  1.333718,
+  1.329564,
+  2.743685
 )
+
+# Create a teal gradient from light to dark
+teal_palette <- colorRampPalette(c("#b2d8d8", "#007a7a"))
+
+# Generate colors mapped to lift values (sorted low to high)
+ranked_colors <- teal_palette(length(lift_values))[rank(lift_values)]
+
+# Resulting color vector, aligned with your lift values
+rule_teal_colors <- ranked_colors
 
 node_labels <- p$x$nodes$label
 node_shapes <- p$x$nodes$shape
@@ -228,8 +236,7 @@ p$x$options$physics <- list(
   ),
   barnesHut = list(
     gravitationalConstant = -2000,
-    springLength = 100,
-    springConstant = 0.01,
+    springConstant = 0.001,
     damping = 0.09
   )
 )
@@ -244,6 +251,60 @@ p$x$events <- list(
 )
 
 p
+
+```
+
+making legend for new color scheme
+```{r}
+library(ggplot2)
+
+# Your lift values
+lift_values <- c(
+  1.755556,
+  1.755556,
+  1.755556,
+  2.972326,
+  2.918284,
+  1.370537,
+  1.339656,
+  1.333718,
+  1.329564,
+  2.743685
+)
+
+# Create a palette function from light teal to dark teal
+teal_palette <- colorRampPalette(c("#b2d8d8", "#007a7a"))
+
+# Choose number of bins (more = smoother gradient)
+n_bins <- 100
+
+# Generate data for legend
+legend_df <- data.frame(
+  lift = seq(min(lift_values), max(lift_values), length.out = n_bins)
+)
+
+# Create plot showing **horizontal** color gradient
+ggplot(legend_df, aes(x = lift, y = 1, fill = lift)) +
+  geom_tile() +
+  scale_fill_gradientn(
+    colors = teal_palette(n_bins),
+    name = "Lift"
+  ) +
+  scale_x_continuous(breaks = pretty(range(lift_values), n = 5)) +
+  theme_minimal() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y  = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid   = element_blank(),
+    axis.title.x = element_text(size = 15),
+    legend.position = "none"  # hide redundant legend
+  ) +
+  coord_fixed(ratio = 0.05) -> legend
+
+# Save as a wide, short image
+ggsave("legend.png", plot = legend, width = 4, height = 1.5)
+
 
 ```
 
