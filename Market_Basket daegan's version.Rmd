@@ -1,0 +1,299 @@
+---
+title: Market Basket Analysis Walkthrough
+---
+Market Basket Analysis, aka affinity analysis aka association rules mining is an unsupervised machine learning technique which applies an algorithm (apriori algorithm) to identify association rules in datasets.
+
+We'll be applying this algorithm to identify associations in a dataset containing information about cases of perforative acute otitis media in children.
+
+We'll start with loading in our packages
+
+```{r}
+library(tidyverse)
+library(knitr)
+library(ggplot2)
+library(lubridate)
+library(arules)
+library(arulesViz)
+library(plyr)
+library(RColorBrewer)
+library(plotly)
+```
+
+And our dataset
+
+```{r}
+nepal.gps = read.csv("nepal_gps.csv")
+og_data<- nepal.gps
+#nepal.gps$macrolide_resistant <- ifelse(nepal.gps$ermB == "NEG" & nepal.gps$mefA == "NEG", "macrolide_s", "macrolide_r")
+
+pcv10_serotypes <- c('1', '4', '5', '6B', '7F', '9V', '14', '18C', '19F', '23F') 
+pcv13_serotypes <- c('3', '6A', '19A')
+pcv15_serotypes <- c('22F', '33F')
+pcv20_serotypes <- c('8', '10A', '11A', '12F', '15B')
+untypable = c("ALTERNATIVE_ALIB_NT","COVERAGE TOO LOW", "SWISS_NT", "UNTYPABLE")
+
+nepal.gps$Serotype_Group <- ifelse(nepal.gps$In_silico_serotype %in% pcv10_serotypes, "PCV10 Serotypes",
+                            ifelse(nepal.gps$In_silico_serotype %in% pcv13_serotypes, "Other PCV Serotypes",
+                            ifelse(nepal.gps$In_silico_serotype %in% pcv15_serotypes, "Other PCV Serotypes",
+                            ifelse(nepal.gps$In_silico_serotype %in% pcv20_serotypes, "Other PCV Serotypes",
+                            ifelse(nepal.gps$In_silico_serotype %in% untypable, "UNTYPABLE",
+                            "Non-PCV Serotypes")))))
+age_0_2 <- c('1', '2') 
+age_3_5 <- c('3', '4', '5')
+age_6_plus <-c(6:14)
+nepal.gps$Age_years <- ifelse(nepal.gps$Age_years %in% age_0_2, "Age 0-2",
+                            ifelse(nepal.gps$Age_years %in% age_3_5, "Age 3-5",
+                                   ifelse(nepal.gps$Age_years %in% age_6_plus, "Age 6-14",
+                            "No Age Data")))
+
+nepal.gps <- nepal.gps[nepal.gps$Serotype_Group != "UNTYPABLE", ]
+
+
+# nepal.gps$Serotype_Group <- ifelse(nepal.gps$In_silico_serotype %in% pcv10_serotypes, "PCV10",
+#                             ifelse(nepal.gps$In_silico_serotype %in% pcv13_serotypes, "PCV13",
+#                             ifelse(nepal.gps$In_silico_serotype %in% pcv15_serotypes, "PCV15",
+#                             ifelse(nepal.gps$In_silico_serotype %in% pcv20_serotypes, "PCV20", 
+#                             ifelse(nepal.gps$In_silico_serotype %in% untypable, "UNTYPABLE",
+#                             "Other")))))
+
+post_vac <- c("POSTPCV10-1YR", "POSTPCV10-2YR", "POSTPCV10-3YR")
+
+nepal.gps$Vaccine_period <- ifelse(nepal.gps$Vaccine_period %in% post_vac, "Post-PCV10", "Pre-PCV10")
+
+nepal.gps$folA_I100L <- ifelse(nepal.gps$folA_I100L =="NEG" , "antibiotic susceptible", "antibiotic resistance")
+  
+#removed cot cat and penecillin, gpsc, wgs_..., macrolide, fol 
+nepal.gps <- nepal.gps %>% 
+  select(Age_years, Clinical_manifestation, Vaccine_period, Serotype_Group)#, folA_I100L
+
+nepal.gps$Clinical_manifestation <- ifelse(nepal.gps$Clinical_manifestation == "UNSPECIFIED IPD", 
+                                            "Unspecified IPD", 
+                                            tools::toTitleCase(tolower(nepal.gps$Clinical_manifestation)))
+
+
+
+
+#cols_to_change1 <- c("Cot", "folA_I100L", "cat")
+
+# for (col in cols_to_change1) {
+#   nepal.gps[[col]] <- ifelse(nepal.gps[[col]] == "POS",
+#                              paste0("POS", col),
+#                              paste0("NEG", col))}
+
+
+
+# cols_to_change2 <- c( "GPSC")
+# 
+# for (col in cols_to_change2) {
+#   num <- as.integer(as.character(nepal.gps[[col]]))  # avoid factor issues
+#   nepal.gps[[col]] <- paste0(col, num)               # "Penicillin2"
+# }
+
+write.csv(nepal.gps, "nepal.gps.csv", row.names = FALSE)
+```
+
+
+```{r}
+tr<-read.transactions("nepal.gps.csv", format= 'basket', sep= ',')
+```
+
+```{r}
+print('Description of the transactions')
+summary(tr)
+```
+
+Let's see what items occur most frequently:
+
+```{r}
+itemFrequencyPlot(tr,topN=25,type="absolute",col=brewer.pal(8,'Pastel2'), main="Nepal_gps rules")
+```
+a relative frequency plot
+ 
+```{r}
+itemFrequencyPlot(tr,topN=20,type="relative",col=brewer.pal(8,'Pastel2'),main="Relative frequency, Nepal_GPS")
+```
+## Create some rules
+
+We use the Apriori algorithm from the arules package to look for itemsets and find support for rules
+
+We pass supp=0.0001 and conf=0.8 to return all the rules have a support of at least 0.1% and confidence of at least 80%. 
+
+We sort the rules by decreasing confidence. 
+
+Here are the rules matching these criteria:
+
+```{r}
+rules <- apriori(tr, parameter = list(supp=0.01, conf=0.8))
+rules <- sort(rules, by='confidence', decreasing = TRUE)
+summary(rules)
+```
+
+
+We have 4093 rules, most are 4 or 5 items long. Let's inspect the top 10 rules according to these parameters (supp 0.001, conf =0.8).
+
+```{r}
+inspect(rules[1:10])
+```
+
+And plot these top 10 rules, or 20, or 50.
+
+```{r}
+topRules <- rules[1:10]
+plot(rules)
+```
+now with more colors
+```{r}
+plot(rules, method = "two-key plot")
+```
+
+now how about a network graph?
+```{r}
+plot(topRules, method="graph")
+```
+Now let's see an interactive map:
+```{r}
+plot(topRules, method="graph", engine = 'interactive')
+```
+
+```{r}
+plot(topRules, method = "grouped")
+```
+
+```{r}
+plot(topRules, method = "graph",  engine = "htmlwidget")
+```
+
+adding in a new color scheme
+
+```{r}
+# Create base plot
+p <- plot(topRules, method = "graph", engine = "htmlwidget")
+
+# Extract rule quality
+rule_teal_colors <- c(
+  "#b2d8d8",  # lift = 1.755556
+  "#b2d8d8",  # lift = 1.755556
+  "#b2d8d8",  # lift = 1.755556
+  "#007a7a",  # lift = 2.972326
+  "#99cfcf",  # lift = 1.396515
+  "#007c7c",  # lift = 2.918284
+  "#8fd1d1",  # lift = 1.370537
+  "#85d4d4",  # lift = 1.342189
+  "#7bd7d7",  # lift = 1.333718
+  "#75d9d9"   # lift = 1.329564
+)
+
+node_labels <- p$x$nodes$label
+node_shapes <- p$x$nodes$shape
+
+color_list <- vector("list", length(node_labels))
+rule_index <- 1
+
+for (i in seq_along(node_labels)) {
+  if (node_shapes[i] == "circle") {
+    # Rule nodes get teal gradient color
+    color_list[[i]] <- list(
+      background = rule_teal_colors[rule_index],
+      border = "#00356B",
+      highlight = rule_teal_colors[rule_index]
+    )
+    rule_index <- rule_index + 1
+  } else {
+    # Item nodes in gray
+    color_list[[i]] <- list(
+      background = "#d3d3d3",
+      border = "#aaaaaa",
+      highlight = "#d3d3d3"
+    )
+  }
+}
+
+# Apply custom styling
+p$x$nodes$color <- color_list
+p$x$nodes$font <- lapply(seq_len(nrow(p$x$nodes)), function(i) {
+  list(color = "#000000", size = 16, face = "bold")
+})
+p$x$options$nodes <- list(font = list(color = "#000000", size = 16, face = "bold"))
+p$x$nodes$size <- rep(25, nrow(p$x$nodes))
+
+# Physics config
+p$x$options$physics <- list(
+  enabled = TRUE,
+  stabilization = list(
+    enabled = TRUE,
+    iterations = 1000,
+    updateInterval = 25,
+    onlyDynamicEdges = FALSE,
+    fit = TRUE
+  ),
+  barnesHut = list(
+    gravitationalConstant = -2000,
+    springLength = 100,
+    springConstant = 0.01,
+    damping = 0.09
+  )
+)
+
+# Disable physics after layout stabilizes
+p$x$events <- list(
+  stabilized = htmlwidgets::JS("
+    function () {
+      this.physics.disable();
+    }
+  ")
+)
+
+p
+
+```
+
+
+
+```{r}
+plot(topRules, method = "matrix", engine = "3d", measure = "lift")
+```
+
+moving back a bit, let's check a different set of rules:
+
+```{r}
+rules_b <- apriori(tr, parameter = list(supp=0.01, conf=1.0))
+rules_b <- sort(rules_b, by='confidence', decreasing = TRUE)
+summary(rules_b)
+```
+these more stringent criteria mean that we're down to 115 rules to sort through.
+```{r}
+inspect(rules_b[1:10])
+```
+
+try to look for only for rules associated with Carriage
+
+```{r}
+pneumo.rules<-sort(subset(rules_b, subset = rhs %in% "CARRIAGE"))
+
+inspect(pneumo.rules[1:10])
+```
+now let's plot the carriage rules:
+```{r}
+plot(pneumo.rules, measure = c("support", "confidence"), shading = "lift", jitter=0)
+```
+```{r}
+plot(pneumo.rules[1:10], method="graph", engine = 'interactive')
+
+plot(pneumo.rules[1:10], method= "paracoord", control=list(reorder=TRUE))
+```
+reference: [R and Data Mining](http://www.rdatamining.com/examples/association-rules)
+there are other cool market basket analysis visualizations here:
+
+```{r}
+```
+```{r}
+og_data 
+og_data$Serotype_Group <- ifelse(og_data$In_silico_serotype %in% pcv10_serotypes, "PCV10",
+                            ifelse(og_data$In_silico_serotype %in% pcv13_serotypes, "PCV13",
+                            ifelse(og_data$In_silico_serotype %in% pcv15_serotypes, "PCV15",
+                            ifelse(og_data$In_silico_serotype %in% pcv20_serotypes, "PCV20",
+                            ifelse(og_data$In_silico_serotype %in% untypable, "UNTYPABLE",       og_data$In_silico_serotype)))))
+table(og_data$Serotype_Group)
+
+```
+

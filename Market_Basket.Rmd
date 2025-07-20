@@ -32,8 +32,8 @@ untypable = c("ALTERNATIVE_ALIB_NT","COVERAGE TOO LOW", "SWISS_NT", "UNTYPABLE")
 
 nepal.gps$Serotype_Group <- ifelse(nepal.gps$In_silico_serotype %in% pcv10_serotypes, "PCV10 Serotypes",
                             ifelse(nepal.gps$In_silico_serotype %in% pcv13_serotypes, "PCV20 Serotypes",
-                            ifelse(nepal.gps$In_silico_serotype %in% pcv15_serotypes, "PCV20 Serotypes",
-                            ifelse(nepal.gps$In_silico_serotype %in% pcv20_serotypes, "PCV20 Serotypes",
+                            ifelse(nepal.gps$In_silico_serotype %in% pcv15_serotypes, "Other PCV Serotypes",
+                            ifelse(nepal.gps$In_silico_serotype %in% pcv20_serotypes, "Other PCV Serotypes",
                             ifelse(nepal.gps$In_silico_serotype %in% untypable, "UNTYPABLE",
                             "Non-PCV Serotypes")))))
 age_0_2 <- c('1', '2') 
@@ -53,8 +53,7 @@ nepal.gps <- nepal.gps %>%
     Clinical_manifestation == "CARRIAGE" ~ "Carriage",
     Clinical_manifestation == "MENINGITIS" ~ "Meningitis",
     Clinical_manifestation == "UNSPECIFIED IPD" ~ "Unspecified IPD",
-    TRUE ~ Clinical_manifestation  # Keep original if none of the above
-  ))
+    TRUE ~ Clinical_manifestation))
 
 nepal.gps <- nepal.gps %>% 
   select(Age_years, Clinical_manifestation, Vaccine_period, Serotype_Group)
@@ -136,71 +135,127 @@ plot(topRules, method = "grouped")
 ```
 
 ```{r}
-
-# Here is chat trying to change the colors to theme colors
-library(arules)
-library(arulesViz)
-
-# Step 1: Generate and sort rules
-rules <- apriori(tr, parameter = list(supp=0.01, conf=0.8))
-rules <- sort(rules, by='confidence', decreasing = TRUE)
-topRules <- rules[1:10]
-
-# Step 2: Create interactive plot
 p <- plot(topRules, method = "graph", engine = "htmlwidget")
 
-# Step 3: Get node shapes and labels
-node_shapes <- p$x$nodes$shape  # "dot" = circle, "box" = rectangle
 node_labels <- p$x$nodes$label
+node_shapes <- p$x$nodes$shape  # "dot" = item, "box" = rule
 
-# Step 4: Manually assign colors: gray for rules, rotating teals for items
-teal_shades <- c("#008080", "#33a1a1", "#99d3d3")
+rule_lift <- quality(topRules)$lift
+lhs_items <- LIST(lhs(topRules), decode = TRUE)
+rhs_items <- LIST(rhs(topRules), decode = TRUE)
+
+# manual teal gradient
+# Replace this part in your original script
+rule_teal_colors <- c(
+  "#b2d8d8",  # 1.755556
+  "#b2d8d8",  # 1.755556
+  "#b2d8d8",  # 1.755556
+  "#007a7a",  # 2.972326
+  "#007c7c",  # 2.918284
+  "#8fd1d1",  # 1.370537
+  "#85d4d4",  # 1.339656
+  "#7bd7d7",  # 1.333718
+  "#75d9d9",  # 1.329564
+  "#009999"   # 2.743685
+)
+
+
 color_list <- vector("list", length(node_labels))
-teal_index <- 1
+rule_index <- 1  # Track which rule we're on
 
 for (i in seq_along(node_labels)) {
   if (node_shapes[i] == "box") {
-    # Rule node (rectangle) = light gray
     color_list[[i]] <- list(
       background = "#d3d3d3",
       border = "#aaaaaa",
       highlight = "#d3d3d3"
     )
   } else {
-    # Item node (circle) = rotate teal colors
+    # Rule node (circle) - assign color by rule index
     color_list[[i]] <- list(
-      background = teal_shades[teal_index],
+      background = rule_teal_colors[rule_index],
       border = "#00356B",
-      highlight = teal_shades[teal_index]
+      highlight = rule_teal_colors[rule_index]
     )
-    teal_index <- teal_index + 1
-    if (teal_index > length(teal_shades)) teal_index <- 1
+    rule_index <- rule_index + 1
   }
 }
 
 p$x$nodes$color <- color_list
-
-# Step 5: Assign font settings for each node
 p$x$nodes$font <- lapply(seq_len(nrow(p$x$nodes)), function(i) {
   list(color = "#000000", size = 16, face = "bold")
 })
+p$x$options$nodes <- list(font = list(color = "#000000", size = 16, face = "bold"))
+p$x$nodes$size <- rep(25, nrow(p$x$nodes))
 
-# Step 6: Reinforce font visibility in visNetwork settings
-p$x$options$nodes <- list(
-  font = list(
-    color = "#000000",
-    size = 16,
-    face = "bold"
+p$x$options$physics <- list(
+  enabled = TRUE,
+  stabilization = list(
+    enabled = TRUE,
+    iterations = 1000,
+    updateInterval = 25,
+    onlyDynamicEdges = FALSE,
+    fit = TRUE
+  ),
+  barnesHut = list(
+    gravitationalConstant = -2000,
+    springLength = 100,
+    springConstant = 0.01,
+    damping = 0.09
   )
 )
 
-# Step 7: Optional - uniform node size
-p$x$nodes$size <- rep(25, nrow(p$x$nodes))
+p$x$events <- list(
+  stabilized = htmlwidgets::JS("
+    function () {
+      this.physics.disable();
+    }
+  ")
+)
 
-# Step 8: Display the plot
 p
+```
+
+```{r}
+# legend for the above plot
+library(ggplot2)
+
+# Your lifts (unique, sorted)
+lift_values <- sort(unique(c(
+  1.755556,
+  2.972326,
+  1.396515,
+  2.918284,
+  1.370537,
+  1.342189,
+  1.333718,
+  1.329564
+)))
+
+# Create a data frame for plotting
+legend_df <- data.frame(Lift = seq(min(lift_values), max(lift_values), length.out = 100))
+
+# Define a teal gradient palette function from light to dark teal
+teal_palette <- colorRampPalette(c("#b2d8d8", "#007a7a"))
+
+ggplot(legend_df, aes(x = Lift, y = 1, fill = Lift)) +
+  geom_tile() +
+  scale_fill_gradientn(colors = teal_palette(100), breaks = lift_values, labels = round(lift_values, 3)) +
+  labs(fill = "Lift") +
+  theme_minimal() +
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.text.x = element_text(color = "black", size = 10)
+  ) +
+  ylab(NULL) +
+  xlab("Lift") +
+  coord_fixed(ratio = 0.1) +
+  theme(panel.grid = element_blank())
 
 ```
+
 
 
 ```{r}
@@ -295,7 +350,6 @@ p$x$nodes$size <- rep(25, nrow(p$x$nodes))
 
 # Step 9: Show plot
 p
-
 ```
 
 
