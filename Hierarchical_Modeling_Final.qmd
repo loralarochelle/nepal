@@ -449,7 +449,7 @@ ggplot(carriage_serotype_proportions, aes(x = Year)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 carriage_serotype_proportions <- carriage_serotype_proportions %>%
-  mutate(Serotype = recode(Serotype,
+  mutate(Serotype = dplyr::recode(Serotype,
     "PCV10serotypes" = "PCV10 Serotypes",
     "PCV13serotypes" = "Additional PCV13 (Non PCV10)",
     "PCV15serotypes" = "Additional PCV15 (Non PCV13)",
@@ -888,7 +888,7 @@ ggplot(disease_serotype_proportions, aes(x = Year)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 disease_serotype_proportions <- disease_serotype_proportions %>%
-  mutate(Serotype = recode(Serotype,
+  mutate(Serotype = dplyr::recode(Serotype,
     "PCV10serotypes" = "PCV10 Serotypes",
     "PCV13serotypes" = "Additional PCV13",
     "PCV15serotypes" = "Additional PCV15",
@@ -953,11 +953,19 @@ disease_plot <- disease_plot + theme(legend.position = "right",
                                      legend.title = element_text(size=14),
                                      legend.text = element_text(size=12))
 # Combine with shared legend and title
-(carriage_plot | disease_plot) +
-plot_layout(guides = "collect") +
-  plot_annotation(title = "Hierarchical Modeling - Percent of Cases from Each Serotype Group in Each Year",
-                  theme = theme(plot.title = element_text(hjust = 0.3, size = 18, face="bold"))) -> PLOT8
+PLOT8 <- (carriage_plot | disease_plot) +
+  plot_layout(guides = "collect") +
+  plot_annotation(
+    title = "Hierarchical Modeling - Percent of Cases from Each Serotype Group in Each Year",
+    subtitle = expression("Cases ~ " * beta(Serotype~Group[i]) +
+                          mu(Serotype~Group[i] * (Year~Index[j] - Mean~Year)))
+  ) &
+  theme(
+    plot.title = element_text(hjust = 0.3, size = 18, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.3, size = 12, color = "#6A0DAD")
+  )
 
-ggsave("plot8.png", plot=PLOT8, width=12, height=6)
+PLOT8
+ggsave("plot8.png", plot=PLOT8, width=12, height=7)
 ```
 

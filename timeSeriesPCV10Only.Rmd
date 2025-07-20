@@ -6,6 +6,7 @@ date: "2025-07-14"
 
 ```{r}
 library(ggtext)
+library(MASS)
 ```
 
 
@@ -389,13 +390,13 @@ p_m2 <-
       # Specify aspects of the theme plot formatting settings.
       theme(panel.spacing = unit(2, 'lines'), 
             axis.text.x = element_text(angle = 0, size = 12, vjust = 3, margin = margin(t = 10)),
-            axis.text.y = element_text(size = 12, vjust = 3),
+            axis.text.y = element_text(size = 12),
             axis.title = element_text(size = 12),
             axis.title.x = element_text(size = 14),
             axis.title.y =element_text(size = 14),
-            plot.title = element_text(size = 15, face = "bold"),
+            plot.title = element_text(size = 15, face = "bold", hjust = 0.5),
             legend.position = "bottom",
-            plot.subtitle = element_markdown(size = 12),
+            plot.subtitle = element_markdown(size = 12, hjust = 0.5),
         legend.title = element_blank(),
         legend.text = element_text(size = 12)) +
     scale_x_continuous(
