@@ -244,5 +244,5 @@ ggplot(nepal_serotype_props, aes(x = Year, y = prop, color = Serotype_group)) +
     axis.title = element_text(size = 11)
   ) -> props
 props
-ggsave("propsplot.png", plot=props, width=8, height=7)
+ggsave("propsplot.png", plot=props, width=8, height=7, units = "in")
 ```

@@ -243,14 +243,14 @@ serotypeProps$vPeriod <- factor(serotypeProps$vPeriod, levels = c("PREPCV", "POS
 # Plotting
 barProps <- 
 ggplot(serotypeProps, aes(x = Serotype, y = proportion, fill = vPeriod)) +
-  geom_col(position = position_dodge(width = 0.8)) +
+  geom_col(position = position_dodge(width = 0.8), color = "black") +
   labs(title = "Proportions of Pneumococcal Serotypes by Vaccine Period",
        subtitle = "Ordered by Change in Proportion",
        x = "Serotype", y = "Proportion") +
   theme_minimal() +
   scale_fill_manual(
   name = "Vaccine Period",
-  values = c("PREPCV" = "#33a1a1", "POSTPCV" = "#00356B"),
+  values = c("PREPCV" = "#78c2be", "POSTPCV" = "#6A0DAD"),
   labels = c("PREPCV" = "Pre-PCV", "POSTPCV" = "Post-PCV")
 ) +
   theme(panel.spacing = unit(2, 'lines'),
@@ -260,9 +260,9 @@ ggplot(serotypeProps, aes(x = Serotype, y = proportion, fill = vPeriod)) +
             axis.title.x = element_text(size = 14),
             axis.title.y =element_text(size = 14),
             plot.title = element_text(size = 18, face = "bold"),
-            plot.subtitle = element_text(size = 14))
+            plot.subtitle = element_text(size = 14, hjust = 0.52))
 barProps
-ggsave(filename="barChartProps.jpeg", plot = barProps, width=8, height=7)
+ggsave(filename="barChartProps.jpeg", plot = barProps, width=8, height=7, units = "in")
 ```
 
 Trying something

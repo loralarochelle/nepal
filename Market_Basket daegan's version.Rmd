@@ -169,6 +169,20 @@ adding in a new color scheme
 # Create base plot
 p <- plot(topRules, method = "graph", engine = "htmlwidget")
 
+# Replace this part in your original script
+#rule_teal_colors <- c(
+#  "#75d9d9",  # 1.755556
+#  "#75d9d9",  # 1.755556
+#  "#75d9d9",  # 1.755556
+#  "#007a7a",  # 2.972326
+#  "#009999",  # 2.918284
+#  "#8fd1d1",  # 1.370537
+#  "#b2d8d8",  # 1.339656
+#  "#c7eaea",  # 1.333718
+#  "#d9f2f2",  # 1.329564
+#  "#00aaaa"   # 2.743685
+#)
+
 lift_values <- c(
   1.755556,
   1.755556,
@@ -236,7 +250,7 @@ p$x$options$physics <- list(
   ),
   barnesHut = list(
     gravitationalConstant = -2000,
-    springConstant = 0.001,
+    springConstant = 0.0001,
     damping = 0.09
   )
 )
@@ -307,6 +321,7 @@ ggsave("legend.png", plot = legend, width = 4, height = 1.5)
 
 
 ```
+
 
 
 
