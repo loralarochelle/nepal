@@ -800,7 +800,7 @@ samp <- coda.samples(mod, variable.names = c("mu", "beta"), n.iter = 5000)
 # summarizes samples: gives quantile for each variable
 summary(samp)
 par(mar = c(2, 2, 2, 2))  # smaller margins
-# plot(samp)
+plot(samp)
 # densplot(samp, main = "Posterior Density for Parameters")
 
 posterior_summary <- summary(samp)
@@ -958,7 +958,7 @@ PLOT8 <- (carriage_plot | disease_plot) +
   plot_annotation(
     title = "Hierarchical Modeling - Percent of Cases from Each Serotype Group in Each Year",
     subtitle = expression("Cases ~ " * beta(Serotype~Group[i]) +
-                          mu(Serotype~Group[i] * (Year~Index[j] - Mean~Year)))
+                          mu(Serotype~Group[i] * (Year~Index[i] - Mean~Year)))
   ) &
   theme(
     plot.title = element_text(hjust = 0.3, size = 18, face = "bold"),
