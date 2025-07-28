@@ -1,0 +1,317 @@
+---
+title: "Hierarchical Modeling"
+format: html
+editor: visual
+---
+
+## Bayesian Hierarchical Modeling
+
+We begin by loading in our packages & data:
+
+```{r loading in packages and data, echo=FALSE}
+library(reshape2)
+library(lubridate)
+library(MASS)
+library(rjags)
+library(HDInterval)
+library(ggplot2)
+library(sf)
+library(areal)
+library(ggthemes)
+library(gridExtra)
+library(RColorBrewer)
+library(readr)
+library(wesanderson)
+library(viridis)
+library(ggspatial)
+library(janitor)
+library(coda)
+library(ggplot2)
+library(tidyverse)
+
+nepal <- read.csv("nepal.csv")
+nepal.gps <- read.csv("nepal_gps.csv")
+```
+
+We then clean the data and combine the carriage cases from the GPS and Kandaswamy datasets:
+
+```{r data cleaning for hierarchical modeling}
+# make list of serotypes included in each vaccine
+pcv10_serotypes <- c('1', '4', '5', '6B', '7F', '9V', '14', '18C', '19F', '23F')
+pcv13_serotypes <- c('3', '6A', '19A')
+pcv15_serotypes <- c('22F', '33F')
+pcv20_serotypes <- c('8', '10A', '11A', '12F', '15B')
+all_pcv_serotypes <- c(pcv10_serotypes, pcv13_serotypes, pcv15_serotypes, pcv20_serotypes)
+
+# putting carriage samples from gps dataset into non-gps dataset form
+nepal.gps.carriage <- nepal.gps %>%
+  # take only carriage data from 2009 on (not enough cases from 2005-2009)
+  filter(Clinical_manifestation == "CARRIAGE") %>%
+  filter(Year >= 2009) %>%
+  # filter out irrelevant serotypes
+  filter(!(In_silico_serotype %in% c("COVERAGE TOO LOW", "UNTYPABLE", "SWISS_NT", "ALTERNATIVE_ALIB_NT"))) %>%
+  # combine non-PCV serotypes into "other" category
+  mutate(In_silico_serotype = if_else(In_silico_serotype %in% all_pcv_serotypes, In_silico_serotype, "Other")) %>%
+  # group by year, serotype, and count
+  group_by(Year, In_silico_serotype) %>%
+  dplyr::summarize(count = n(), .groups = "drop") %>%
+  rename(Serotype = In_silico_serotype) %>%
+  # pivot into same form as nepal dataset: years as cols, values as counts, all NAs are 0
+  pivot_wider(names_from = Year, values_from = count, values_fill = 0)
+
+# select only counts from the nepal dataset (not proportions), fix name to be just an int
+nepal_new <- nepal %>%
+  dplyr::select(Serotype, X2014n, X2015n, X2017n, X2018n, X2019n, X2021n) %>%
+  rename_with(~ gsub("X|n", "", .x), starts_with("X")) %>%
+  filter(!(Serotype == "PCV10serotypes"))
+
+# join datasets together using full_join by serotype to get full carriage dataset
+nepal_carriage <- full_join(nepal_new, nepal.gps.carriage, by = "Serotype") %>%
+  mutate(across(-Serotype, ~ replace_na(.x, 0))) %>%
+  # get rid of Total row: it is no longer correct
+  filter(Serotype != "Total") %>%
+  # get rid of .x and .y from years that only had data from one of the two datasets
+  mutate(across(ends_with(".x"), ~ coalesce(.x, get(sub(".x$", ".y", cur_column()))),
+                .names = "{sub('.x$', '', .col)}")) %>%
+  dplyr::select(-matches("\\.x$|\\.y$"))
+
+carriage_serotype_year_counts <- nepal_carriage %>%
+  pivot_longer(cols = -Serotype, names_to = "Year", values_to = "cases")
+
+serotype_group_sums <- carriage_serotype_year_counts %>%
+  mutate(group = case_when(Serotype %in% pcv10_serotypes ~ "PCV10serotypes", Serotype %in% pcv13_serotypes ~ "PCV13serotypes", Serotype %in% pcv15_serotypes ~ "PCV15serotypes", Serotype %in% pcv20_serotypes ~ "PCV20serotypes")) %>%
+  filter(!is.na(group)) %>%
+  group_by(Serotype = group, Year) %>%
+  summarise(cases = sum(cases), .groups = "drop")
+carriage_groups_df <- bind_rows(carriage_serotype_year_counts, serotype_group_sums)
+
+# take just the total counts from each serotype group
+carriage_groups <- carriage_groups_df %>%
+  filter(Serotype %in% c("Other", "PCV10serotypes", "PCV13serotypes", "PCV15serotypes", "PCV20serotypes"))
+
+# turning cases into proportions for each serotype group -> this is what will be modeled
+carriage_serotype_year_totals <- carriage_groups %>%
+  group_by(Year, Serotype) %>%
+  summarise(total_cases = sum(cases), .groups = "drop")
+# get total cases per year
+carriage_year_totals <- carriage_serotype_year_totals %>%
+  group_by(Year) %>%
+  summarise(year_total = sum(total_cases), .groups = "drop")
+# join & compute proportions, then multiply by 100 and round down
+carriage_serotype_proportions <- carriage_serotype_year_totals %>%
+  left_join(carriage_year_totals, by = "Year") %>%
+  mutate(proportion = total_cases / year_total,
+         Percent = floor(proportion * 100)) %>%
+  dplyr::select(Serotype, Year, Percent)
+```
+
+Now that we have a dataset with counts per year, we'll add a total counts column to prepare the data to be modeled using the multinomial distribution:
+
+```{r pivot dataset to work with the multinomial distribution}
+# pivot to wide format -> allows to calculate total cases per year
+library(tidyverse)
+carriage_groups_wide <- carriage_groups %>%
+  pivot_wider(names_from = Serotype,
+              values_from = cases,
+              values_fill = 0)
+carriage_groups_wide$Year <- as.numeric(carriage_groups_wide$Year)
+
+# calculate total cases per year
+carriage_groups_wide <- carriage_groups_wide %>%
+  mutate(total_cases = rowSums(dplyr::select(., -Year))) %>%
+  dplyr::select(Year, total_cases, everything())
+
+# map each serotype to an ID map
+serotype_cols <- colnames(carriage_groups_wide)[!(colnames(carriage_groups_wide) %in% c("Year", "total_cases"))]
+sero_id_map <- setNames(seq_along(serotype_cols), serotype_cols)
+
+# reshape to long format for JAGS
+carriage_serotype_groups_df <- carriage_groups_wide %>%
+  pivot_longer(cols = all_of(serotype_cols),
+               names_to = "Serotype",
+               values_to = "cases") %>%
+  mutate(sero_id = as.integer(factor(Serotype, levels = serotype_cols)),
+    year_id = as.integer(factor(Year)))
+```
+
+Next, we construct our JAGS model. We are using a multinomial likelihood to account for differences in data reporting over time.
+
+```{r JAGS model}
+jcode <- "model {
+  for (i in 1:N) {
+    counts[i, 1:S] ~ dmulti(p[i, 1:S], total_cases[i])
+    
+    for (j in 1:S) {
+      eta[i, j] <- alpha[j] + beta[j] * (year_id[i] - mean_year)
+    }
+    
+    for (j in 1:S) {
+      exp_eta[i, j] <- exp(eta[i, j])
+    }
+    
+    for (j in 1:S) {
+      p[i, j] <- exp_eta[i, j] / sum(exp_eta[i, 1:S])
+    }
+  }
+  
+  for (j in 1:S) {
+    alpha[j] ~ dnorm(mu_alpha, 0.001)
+    beta[j]  ~ dnorm(mu_beta, 0.001)
+  }
+  mu_alpha ~ dnorm(0, 0.001)
+  mu_beta  ~ dnorm(0, 0.001)
+}
+"
+```
+
+```{r}
+# prepare data list for JAGS
+jdat <- list(
+  N = length(unique(carriage_serotype_groups_df$Year)), # number of years
+  S = length(unique(carriage_serotype_groups_df$sero_id)), # number of serotypes
+  counts = matrix(carriage_serotype_groups_df$cases,
+                  nrow = length(unique(carriage_serotype_groups_df$Year)),
+                  ncol = length(unique(carriage_serotype_groups_df$sero_id)),
+                  byrow = TRUE),
+  total_cases = carriage_serotype_groups_df$total_cases[seq(1, nrow(carriage_serotype_groups_df), by = length(unique(carriage_serotype_groups_df$sero_id)))],
+  year_id = carriage_serotype_groups_df$year_id[seq(1, nrow(carriage_serotype_groups_df), by = length(unique(carriage_serotype_groups_df$sero_id)))],
+  mean_year = (length(unique(carriage_serotype_groups_df$year_id)) + 1) / 2
+)
+
+# run the model
+mod <- jags.model(textConnection(jcode), data = jdat, n.chains = 2)
+update(mod, 1000)  # Burn-in
+samp <- coda.samples(mod, variable.names = c("alpha", "beta"), n.iter = 5000)
+```
+
+Next, we begin to analyze the results, starting with the posterior summaries for each slope and intercept:
+
+```{r}
+# get posterior summaries & round
+posterior_summary <- summary(samp)
+round(posterior_summary$statistics, 3)
+round(posterior_summary$quantiles, 3)
+
+# get beta & alpha means
+samp_mat <- as.matrix(samp)
+beta_samples <- samp_mat[, grep("^beta", colnames(samp_mat))]
+beta_means <- colMeans(beta_samples)
+beta_ci <- apply(beta_samples, 2, quantile, probs = c(0.025, 0.975))
+alpha_samples <- samp_mat[, grep("^alpha", colnames(samp_mat))]
+alpha_means <- colMeans(alpha_samples)
+
+# plot the estimates for beta
+df_beta <- data.frame(param = names(beta_means),
+                      mean = beta_means,
+                      lower = beta_ci[1, ],
+                      upper = beta_ci[2, ])
+
+ggplot(df_beta, aes(x = param, y = mean)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  coord_flip() +
+  labs(title = "Posterior Estimates for Beta", y = "Effect Size", x = "") +
+  theme_minimal()
+```
+
+```{r get data ready for plotting}
+# calculate predicted probabilities using softmax
+year_seq <- sort(unique(jdat$year_id))
+sero_seq <- 1:jdat$S
+pred_grid <- expand.grid(year = year_seq,
+                         sero = sero_seq)
+pred_grid <- pred_grid %>%
+  group_by(year) %>%
+  mutate(eta = alpha_means[sero] + beta_means[sero] * (year - jdat$mean_year),
+        exp_eta = exp(eta),
+        sum_exp_eta = sum(exp_eta),
+        p = exp_eta / sum_exp_eta) %>%
+  ungroup()
+
+# convert year_id back to actual year for mapping
+year_map <- data.frame(year_id = year_seq, Year = sort(unique(carriage_serotype_groups_df$Year)))
+pred_grid <- left_join(pred_grid, year_map, by = c("year" = "year_id"))
+```
+
+Last, we get data ready for plotting the expected proportion trends vs. the observed proportions:
+
+```{r}
+# add back the serotype labels for plitting
+serotype_labels <- names(sero_id_map)
+
+carriage_serotype_groups_df <- carriage_serotype_groups_df %>%
+  mutate(Serotype = factor(Serotype, levels = serotype_labels)) %>%
+  group_by(Year) %>%
+  mutate(
+    eta = alpha_means[sero_id] + beta_means[sero_id] * (year_id - jdat$mean_year),
+    exp_eta = exp(eta),
+    sum_exp_eta = sum(exp_eta),
+    expected_percent = (exp_eta / sum_exp_eta) * 100, # expected percent
+    Percent = (cases / sum(cases)) * 100            # observed percent
+  ) %>%
+  ungroup()
+
+# rename serotype groups for plotting
+carriage_serotype_groups_df <- carriage_serotype_groups_df %>%
+  mutate(Serotype = recode(Serotype,
+                           "PCV10serotypes" = "PCV10 Serotypes",
+                           "PCV13serotypes" = "Additional PCV13",
+                           "PCV15serotypes" = "Additional PCV15",
+                           "PCV20serotypes" = "Additional PCV20",
+                           "Other" = "Non-PCV Serotypes"),
+         Serotype = factor(Serotype, levels = c(
+           "PCV10 Serotypes",
+           "Additional PCV13",
+           "Additional PCV15",
+           "Additional PCV20",
+           "Non-PCV Serotypes"
+         )))
+
+# custom color pallete for plotting
+custom_colors <- c(
+  "PCV10 Serotypes"    = "#00356B",
+  "Additional PCV13"   = "#6A0DAD",
+  "Additional PCV15"   = "#008080",
+  "Additional PCV20"   = "#E69F00",
+  "Non-PCV Serotypes"  = "#999999"
+)
+```
+
+Last, we come up with our final plot:
+
+```{r plot of expected and observed percentages}
+carriage_plot <- ggplot(carriage_serotype_groups_df, aes(x = Year, group = Serotype, color = Serotype)) +
+  geom_point(aes(y = Percent), alpha = 0.6) +
+  geom_line(aes(y = expected_percent), size = 1) +
+  scale_x_continuous(
+    breaks = seq(floor(min(carriage_serotype_groups_df$Year)), ceiling(max(carriage_serotype_groups_df$Year)), by = 2),
+    limits = c(2009, 2021)
+  ) +
+  scale_color_manual(values = custom_colors) +
+  ylim(0, 80) +
+  labs(
+    x = "Year",
+    y = "Percent of Cases Per Year",
+    title = "Hierarchical Modeling: Percent of Carriage Cases",
+    subtitle = expression(
+      "For year " * t * " and serotype group " * s * 
+        ":  " * 
+        p[ts] == frac(exp(alpha[s] + beta[s] * (Year[t] - bar(Year))), 
+                      sum(exp(alpha[k] + beta[k] * (Year[t] - bar(Year)))))
+    )
+    ,
+    color = "Serotype Group"
+  ) +
+  theme_linedraw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 14),
+    plot.title = element_text(size = 15, face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(size = 13, color = "purple", hjust = 0.5)
+  )
+
+carriage_plot
+
+ggsave("Carriage_Plot_HM.jpeg", plot=carriage_plot, width=9, height=5)
+```
