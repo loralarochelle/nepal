@@ -1,0 +1,368 @@
+---
+title: "EDA"
+format: html
+editor: visual
+---
+
+Before beginning our analyses, to start visualizing our data we began with EDA. First we load in our files:
+
+```{r loading in packages and files}
+library(tidyverse)
+library(MASS)
+library(dplyr)
+nepal <- read.csv("nepal.csv")
+nepal_gps <- read.csv("nepal_gps.csv")
+pcv10_serotypes <- c('1', '4', '5', '6B', '7F', '9V', '14', '18C', '19F', '23F') 
+pcv13_serotypes <- c('3', '6A', '19A')
+pcv15_serotypes <- c('22F', '33F')
+pcv20_serotypes <- c('8', '10A', '11A', '12F', '15B')
+```
+
+We wanted to look at carriage and disease trends over time on data from the Global Pneumococcal Sequencing Project (GPS). We fit the data using a negative binomial regression (as we have over-dispersed count data), and filtered out cases from untypable serotypes. We noticed that 2014 had way more reported cases than any other year, hypothesizing that this was because surveillance efforts increased in the year before the vaccine intervention. The wide error bars on the disease data led us to only focus on carriage cases in our final time series model.
+
+```{r fitting disease and carriage data-negative binomial fit}
+df.gps <- nepal_gps %>%
+  filter(Year >= 2009) %>%
+  filter(In_silico_serotype != "ALTERNATIVE_ALIB_NT" & 
+           In_silico_serotype != "SWISS_NT" &
+           In_silico_serotype != "COVERAGE TOO LOW" &
+           In_silico_serotype != "UNTYPABLE") %>%
+  mutate(Disease_Status = ifelse(Clinical_manifestation == "CARRIAGE", 
+                                 "Carriage", "Disease"))
+pcv10_serotypes <- c('1', '4', '5', '6B', '7F', '9V', '14', '18C', '19F', '23F')
+pcv13_serotypes <- c('3', '6A', '19A')
+pcv15_serotypes <- c('22F', '33F')
+pcv20_serotypes <- c('8', '10A', '11A', '12F', '15B')
+df.gps$Serotype_group <- ifelse(
+  df.gps$In_silico_serotype %in% pcv10_serotypes, "PCV10",
+  ifelse(df.gps$In_silico_serotype %in% pcv13_serotypes, "PCV13",
+  ifelse(df.gps$In_silico_serotype %in% pcv15_serotypes, "PCV15",
+  ifelse(df.gps$In_silico_serotype %in% pcv20_serotypes, "PCV20",
+  "OTHER"))))
+
+df.gps2 <- df.gps %>%
+  filter(Year >= 2009) %>%
+  mutate(Disease_Status = ifelse(Clinical_manifestation == "CARRIAGE", "Carriage", "Disease")) %>%
+  group_by(Year, Disease_Status) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(Disease_Status)
+p1 <- ggplot(df.gps2, aes(x = Year, y = count, color=Disease_Status)) +
+      geom_line() +
+      geom_point() +
+      labs(title = "Cases of Pneumococcal Disease in Nepal Over time",
+        x = "Year", y = "Count") +
+      geom_vline(xintercept = 2015, col = 'red', lty = 2) +
+      theme_linedraw()
+p1
+df.gps2 <- tibble::rownames_to_column(df.gps2, var = "index") %>%
+  mutate(index = as.numeric(index))
+
+df.gps.carriage <- df.gps2 %>%
+  filter(Disease_Status == "Carriage")
+mod.carriage <- glm.nb(data = df.gps.carriage, count ~ index)
+pred.carriage <- predict(mod.carriage, type = "response", se.fit = TRUE)
+df.pred.carriage <- df.gps.carriage %>%
+  mutate(se.fit = pred.carriage$se.fit, 
+         pred.carriage = pred.carriage$fit) %>%
+  mutate(conf.low.carriage = pred.carriage - 1.96 * se.fit,
+         conf.high.carriage = pred.carriage + 1.96 * se.fit)
+
+df.gps.disease <- df.gps2 %>%
+  filter(Disease_Status == "Disease")
+mod.disease <- glm.nb(data = df.gps.disease, count ~ index)
+pred.disease <- predict(mod.disease, type = "response", se.fit = TRUE)
+df.pred.disease <- df.gps.disease %>%
+  mutate(se.fit = pred.disease$se.fit, 
+         pred.disease = pred.disease$fit) %>%
+  mutate(conf.low.disease = pred.disease - 1.96 * se.fit,
+         conf.high.disease = pred.disease + 1.96 * se.fit)
+
+p1a <- p1 +
+  geom_line(data = df.pred.carriage, 
+            aes(x = Year, y = pred.carriage),
+            color = "red") +
+  geom_ribbon(data = df.pred.carriage, 
+              aes(ymin = conf.low.carriage, 
+                  ymax = conf.high.carriage), 
+              alpha = 0.2, fill = "blue") +
+  geom_line(data = df.pred.disease, 
+            aes(x = Year, y = pred.disease),
+            color = "blue") +
+  geom_ribbon(data = df.pred.disease, 
+              aes(ymin = conf.low.disease, 
+                  ymax = conf.high.disease), 
+              alpha = 0.2, fill = "lightblue") +
+  labs(title = "Negative Binomial Fit of Pneumococcal Trends in Nepal")+
+  theme(plot.title = element_text(face="bold"))
+p1a
+```
+
+The trendlines show an increase in cases over time, even after the vaccine intervention. We believe this may be due to increase surveillance efforts, and may not reflect actual case trends in Nepal over time. Inconsistencies in data reporting prompted us to look at cases over time by their serotype to analyze serotype-specific trends. We used data from Kandasamy et al.'s 2024 carriage study to create the following plot. We see that cases caused by PCV10 serotypes have decreased over time, but cases caused by "Other" serotypes (non-PCV) have remained relatively high.
+
+```{r plotting trends of serotypes}
+# preparing data for plotting
+nepal_plot_data <- nepal %>%
+  # select serotype + year columns
+  dplyr::select(Serotype, X2014n, X2015n, X2017n, X2018n, X2019n, X2021n) %>%
+  # format data frame
+  pivot_longer(cols = -Serotype,
+               names_to = "Year",
+               values_to = "Count") %>%
+  # remove X and n from the year counts
+  mutate(Year = gsub("X|n", "", Year)) %>%
+  # filter out pcv10serotypes & the total rows
+  filter((!Serotype %in% pcv10_serotypes) & (!Serotype=="Total"))
+
+# plot serotype trends over time
+ggplot(data = nepal_plot_data, aes(x = as.numeric(Year), y = Count, color = Serotype)) +
+  geom_line() +
+  theme_bw() +
+  labs(x = "Year", y = "Count", title = "Pneumococcal Infection Counts")
+```
+
+We then wanted to look at the serotypes from the PCV10 vaccine individually. This scale allows us to analyze these trends more closely, and better illustrates the decrease in case counts:
+
+```{r plotting trends of PCV serotypes}
+# getting data ready for plotting
+nepal_plot_data_PCV10 <- nepal %>%
+  # select serotype + year columns
+  dplyr::select(Serotype, X2014n, X2015n, X2017n, X2018n, X2019n, X2021n) %>%
+  # format data frame
+  pivot_longer(cols = -Serotype,
+               names_to = "Year",
+               values_to = "Count") %>%
+  # remove X and n from the year counts
+  mutate(Year = gsub("X|n", "", Year)) %>%
+  # filter out pcv10serotypes & the total rows
+  filter((Serotype %in% pcv10_serotypes) & (!Serotype=="Total"))
+
+# plot serotype trends over time
+ggplot(data = nepal_plot_data_PCV10, aes(x = as.numeric(Year), y = Count, color = Serotype)) +
+  geom_line() +
+  theme_bw() +
+  labs(x = "Year", y = "Count", title = "PCV10 Pneumococcal Carriage Cases")
+```
+
+We see the PCV10 cases are decreasing. We next looked at the serotype-specific data by proportions rather than counts (the proportion of total cases caused by each serotype). All listed serotypes here are included in other PCV vaccines: the 13, 15, and 20-valent PCVs. PCV10 serotypes are all grouped together. We included "Other" (non-PCV) serotypes here as well. This plot shows a clear increase in the proportion of detected cases attributed to non-PCV serotypes.
+
+```{r same code as above, but with proportions instead of counts}
+# getting data ready for plotting
+nepal_plot_data_prop <- nepal %>%
+  # select serotype + year columns
+  dplyr::select(Serotype, X2014p, X2015p, X2017p, X2018p, X2019p, X2021p) %>%
+  # format data frame
+  pivot_longer(cols = -Serotype,
+               names_to = "Year",
+               values_to = "Proportion") %>%
+  # remove X and n from the years
+  mutate(Year = gsub("X|p", "", Year)) %>%
+  # filter out pcv10serotypes & the total rows
+  filter((!Serotype %in% pcv10_serotypes) & (!Serotype=="Total"))
+
+# plot serotype trends over time
+ggplot(data = nepal_plot_data_prop, aes(x = as.numeric(Year), y = Proportion, color = Serotype)) +
+  geom_line() +
+  theme_bw() +
+  labs(x = "Year", y = "Proportion", title = "Pneumococcal Infection \nProportions by Serotype Over Time")
+```
+
+This trend is very interesting, but Kandasamy et al.'s paper only looks at carriage cases. This led us to look back at the GPS dataset, has disease data as well, so we decided to compare the serotype-specific trends for both carriage and disease manifestations. We grouped the serotypes from this dataset based on which vaccine-targeted group they belonged to (PCV10, additional PCV13, PCV15, PCV20; and non-PCV). We can see different trends for both carriage and disease manifestations, but in both we see that the greatest proportion of cases in recent years can be attributed to non-PCV serotypes.
+
+```{r}
+serotypes_all <- unique(nepal_gps$In_silico_serotype)
+non_vaccine_serotypes <- setdiff(serotypes_all, pcv10_serotypes)
+non_vaccine_serotypes <- non_vaccine_serotypes[!non_vaccine_serotypes %in% c("ALTERNATIVE_ALIB_NT","COVERAGE TOO LOW", "SWISS_NT", "UNTYPABLE")]
+                                                 
+# Shorten and classify
+nepal_shortened <- nepal_gps[, c("Year", "Clinical_manifestation", "In_silico_serotype")]
+
+nepal_shortened$Serotype_group <- ifelse(
+  nepal_shortened$In_silico_serotype %in% pcv10_serotypes, "PCV10",
+  ifelse(nepal_shortened$In_silico_serotype %in% pcv13_serotypes, "PCV13",
+  ifelse(nepal_shortened$In_silico_serotype %in% pcv15_serotypes, "PCV15",
+  ifelse(nepal_shortened$In_silico_serotype %in% pcv20_serotypes, "PCV20", "Other"))))
+
+# Assign Disease vs Carriage
+nepal_shortened <- nepal_shortened %>%
+  filter(Year >= 2009) %>%
+  mutate(Disease_Status = ifelse(Clinical_manifestation == "CARRIAGE", "Carriage", "Disease"))
+
+# Count data
+nepal_serotype_counts <- nepal_shortened %>%
+  group_by(Year, Disease_Status, Serotype_group) %>%
+  summarise(count = n(), .groups = "drop")
+
+# Proportion data (within each year and disease status)
+nepal_serotype_props <- nepal_serotype_counts %>%
+  group_by(Year, Disease_Status) %>%
+  mutate(prop = count / sum(count)) %>%
+  ungroup()
+
+# Define custom color palette
+custom_colors <- c(
+  "PCV10" = "#00356B",   # Yale Blue
+  "Additional PCV13" = "#6A0DAD",   # Purple
+  "Additional PCV15" = "#008080",   # Teal
+  "Additional PCV20" = "#E69F00",   # Gold
+  "Non-PCV" = "#999999"    # Grey fallback
+)
+
+nepal_serotype_props <- nepal_serotype_props %>%
+  mutate(
+    Serotype_group = dplyr::recode(Serotype_group,
+      "PCV10" = "PCV10",
+      "PCV13" = "Additional PCV13",
+      "PCV15" = "Additional PCV15",
+      "PCV20" = "Additional PCV20",
+      "Other" = "Non-PCV"
+    ),
+    Serotype_group = factor(Serotype_group, levels = c(
+      "PCV10",
+      "Additional PCV13",
+      "Additional PCV15",
+      "Additional PCV20",
+      "Non-PCV"
+    ))
+  )
+
+# === New proportion plot ===
+ggplot(nepal_serotype_props, aes(x = Year, y = prop, color = Serotype_group)) +
+  geom_line() +
+  geom_point() +
+  facet_grid(Disease_Status ~ .) +
+  scale_color_manual(values = custom_colors) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  labs(
+    title = "Proportion of Pneumococcal Infection in Each Year \nFrom Each Serotype Group",
+    y = "Proportion of Cases",
+    x = "Year",
+    color = "Serotype Group"
+  ) +
+  theme_linedraw() +
+  theme(
+    plot.title = element_text(face = "bold", size = 18, hjust = 0.5),
+    plot.title.position = "plot",  # ← ensures hjust is applied to full plot
+    strip.text = element_text(size = 12),
+    axis.title = element_text(size = 11)
+  ) -> props
+props
+ggsave("Serotype_Proportions_EDA_Plot.png", plot=props, width=8, height=7, units = "in")
+```
+
+We again looked at PCV10 serotypes specifically, but now looked at the change in the percentage of cases attributed to these serotypes from the Pre- to Post-PCV10 period. We looked at just carriage cases here because we wanted to include this image on our poster-since both time series & hierarchical modeling were only able to look at carriage cases, we limited this analysis to only these cases as well. We merged the GPS and Kandasamy datasets. Since we're looking at serotype-specific trends and the method for data collection is not likely influenced by which serotype is being carried, we believe this to be valid and helpful as we have limited data.
+
+```{r}
+### Filtering & preparing carriage data from nepal_gps
+pcv10GpsCarriage <- nepal_gps %>%
+  filter(
+    Clinical_manifestation == "CARRIAGE",
+    !In_silico_serotype %in% c("COVERAGE TOO LOW", "UNTYPABLE", "SWISS_NT", "ALTERNATIVE_ALIB_NT")
+  ) %>%
+  mutate(
+    Serotype = In_silico_serotype,
+    PCV10_group = ifelse(Serotype %in% pcv10_serotypes, "PCV10", "Non-PCV10"),
+    vPeriod = ifelse(
+      Vaccine_period %in% c("POSTPCV10-1YR", "POSTPCV10-2YR", "POSTPCV10-3YR"),
+      "POSTPCV",
+      Vaccine_period),
+    Year = as.integer(Year)) %>%
+  group_by(Year, Serotype, vPeriod, PCV10_group) %>%
+  summarise(Count = n(), .groups = "drop")
+
+### Filtering and preparing Kandasamy dataset (nepal)
+pcv10NepalCarriage <- nepal %>%
+  dplyr::select(Serotype, starts_with("X")) %>%
+  pivot_longer(
+    cols = -Serotype,
+    names_to = "Year",
+    values_to = "Count"
+  ) %>%
+  mutate(
+    Year = as.integer(gsub("X|n", "", Year)),
+    vPeriod = case_when(
+      Year %in% c(2014, 2015) ~ "PREPCV",
+      Year %in% c(2017, 2018, 2019, 2021) ~ "POSTPCV",
+      TRUE ~ NA_character_
+    ),
+    PCV10_group = ifelse(Serotype %in% pcv10_serotypes, "PCV10", "Non-PCV10")
+  ) %>%
+  filter(
+    Serotype %in% pcv10_serotypes,
+    Serotype != "Total",
+    !is.na(vPeriod)
+  )
+
+# Merge datasets and summarize counts
+mergedWithSum <- full_join(
+  pcv10GpsCarriage, pcv10NepalCarriage,
+  by = c("Year", "Serotype", "vPeriod", "PCV10_group")
+) %>%
+  mutate(
+    CCount = rowSums(across(c(Count.x, Count.y)), na.rm = TRUE)
+  ) %>%
+  filter(PCV10_group == "PCV10") %>%
+  dplyr::select(Year, Serotype, vPeriod, PCV10_group, CCount)
+
+# Compute proportions by serotype and vaccine period
+serotypeProps <- mergedWithSum %>%
+  group_by(vPeriod, Serotype) %>%
+  summarise(count = sum(CCount, na.rm = TRUE), .groups = "drop") %>%
+  mutate(
+    proportion = count / sum(count),
+    vPeriod = factor(vPeriod, levels = c("PREPCV", "POSTPCV"))
+  ) %>%
+  arrange(vPeriod)
+
+changeTable <- serotypeProps %>%
+  pivot_wider(names_from = vPeriod, values_from = proportion, values_fill = 0) %>%
+  group_by(Serotype) %>%
+  summarise(
+    PREPCV = sum(PREPCV, na.rm = TRUE),
+    POSTPCV = sum(POSTPCV, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    diffProp = POSTPCV - PREPCV
+  ) %>%
+  arrange(desc(diffProp)) %>%
+  mutate(
+    Serotype = factor(Serotype, levels = unique(Serotype))
+  ) %>%
+  dplyr::select(Serotype, preProp = PREPCV, postProp = POSTPCV, diffProp)
+
+
+# update factor levels in serotypeProps to match order from changeTable
+serotypeProps <- serotypeProps %>%
+  mutate(
+    Serotype = factor(Serotype, levels = levels(changeTable$Serotype)),
+    vPeriod = factor(vPeriod, levels = c("PREPCV", "POSTPCV"))
+  )
+
+
+### Plotting!
+barProps <- ggplot(serotypeProps, aes(x = Serotype, y = proportion, fill = vPeriod)) +
+  geom_col(position = position_dodge(width = 0.8), color = "black") +
+  labs(
+    title = "Proportions of Pneumococcal Serotypes by Vaccine Period",
+    subtitle = "Ordered by Change in Proportion",
+    x = "Serotype", y = "Proportion"
+  ) +
+  theme_minimal() +
+  scale_fill_manual(
+    name = "Vaccine Period",
+    values = c("PREPCV" = "#78c2be", "POSTPCV" = "#6A0DAD"),
+    labels = c("PREPCV" = "Pre-PCV", "POSTPCV" = "Post-PCV")
+  ) +
+  theme(
+    panel.spacing = unit(2, 'lines'),
+    axis.text.x = element_text(angle = 45, size = 12),
+    axis.text.y = element_text(size = 12),
+    axis.title = element_text(size = 14),
+    plot.title = element_text(size = 18, face = "bold"),
+    plot.subtitle = element_text(size = 14, hjust = 0.52)
+  )
+
+barProps
+ggsave("PCV10_Percent_Change_Plot.jpeg", plot = barProps, width = 8, height = 7, units = "in")
+
+```

@@ -1,0 +1,271 @@
+---
+title: "Time Series Analysis - PCV10 Carriage Cases"
+output:
+  html_document:
+    df_print: paged
+date: "2025-07-14"
+---
+
+For our time series analysis, we modeled carriage cases from PCV10 serotypes over time. Due to our limited data, we were unable to look at disease cases as well. From our EDA, we saw different trends in carriage and disease cases over time, and thus did not want to combine them.
+
+We start by loading in packages:
+
+```{r loading in packages and data}
+library(ggtext)
+library(MASS)
+library(tidyverse)
+library(ggplot2)
+
+nepal_gps = read.csv("nepal_gps.csv")
+nepal_nonGPS = read.csv("nepal.csv")
+```
+
+We decided to combine carriage cases from our two data sources to have more data to work with. We used non-PCV10 carriage cases from both sources as an offset (more on that later), so inconsistencies in data reporting were accounted for in the model. We also only had aggregate year data (no seasonality). Both of these were challenges when constructing this model, but we worked within the limits of our data. We also had to filter out 2014 to get the model to fit correctly: otherwise the error bars stretched below 0 cases (obviously impossible). We hypothesize that there was better surveillance in Nepal in 2014 as that was the year before vaccine intervention.
+
+First we combined the datasets:
+
+```{r cleaning and combining datasets}
+### Starting with Non-GPS dataset
+# selecting only PCV10 serotypes
+pcv10Serotypes2 <- c('PCV10serotypes')
+nonGpsShortened <- nepal_nonGPS[nepal_nonGPS$Serotype %in% pcv10Serotypes2, ]
+# selecting all the non PCV10 serotypes to be used in the offset from the non-GPS dataset 
+NONpcv10Serotypes <- c('3', '6A', '19A', '22F', '33F', '8', '10A', '11A', '12F', '15B', 'Other')
+NONPCVforGPS <- nepal_nonGPS[nepal_nonGPS$Serotype %in% NONpcv10Serotypes, ]
+# pivoting the non-GPS PCV10 dataset
+pcv10NonGpsCarriage <- nonGpsShortened %>%
+  # Selecting year columns
+  dplyr::select(X2014n, X2015n, X2017n, X2018n, X2019n, X2021n) %>%
+  # Formatting data frame
+  pivot_longer(cols = everything(),
+               names_to = "Year",
+               values_to = "Count") %>%
+  # Removing X and n from the year counts
+  mutate(Year = gsub("X|n", "", Year)) %>%
+  group_by(Year) %>%
+  slice_tail()
+# Pivoting the non-GPS non-PCV10 dataset
+NonPCVForOffset <- NONPCVforGPS %>%
+  # Selecting year columns
+  dplyr::select(X2014n, X2015n, X2017n, X2018n, X2019n, X2021n) %>%
+  # Formatting data frame
+  pivot_longer(cols = everything(),
+               names_to = "Year",
+               values_to = "Count") %>%
+  # Removing X and n from the year counts
+  mutate(Year = gsub("X|n", "", Year)) %>%
+  group_by(Year) %>%
+  slice_tail()
+
+### GPS Dataset
+# defining the serotypes that are in the pcv10 vaccine
+pcv10_serotypes <- c('1', '4', '5', '6B', '7F', '9V', '14', '18C', '19F', '23F')
+
+# selecting three variables of interest
+GpsShortened <- nepal_gps[, c("Year", "Clinical_manifestation", "In_silico_serotype")]
+
+# adding a new column: PCV10 or not
+GpsShortened$PCV10_group <- ifelse(GpsShortened$In_silico_serotype %in% pcv10_serotypes,"PCV10", "Non-PCV10")
+# selecting only PCV10 
+pcv10GpsCarriage <- GpsShortened[GpsShortened$PCV10_group == "PCV10", ]
+# selecting only non-PCV10
+NONpcv10GpsCarriage <- GpsShortened[GpsShortened$PCV10_group == "Non-PCV10", ]
+
+# Selecting only carriage cases and calculating the count of cases for each year for the PCV10 and non-PCV10 cases
+pcv10GpsCarriage2 <- pcv10GpsCarriage %>%
+  dplyr::filter(Clinical_manifestation == "CARRIAGE") %>%
+  group_by(Year) %>%
+  dplyr::summarize(IPDCount = n())
+
+NONpcv10GpsCarriage2 <- NONpcv10GpsCarriage %>%
+  dplyr::filter(Clinical_manifestation == "CARRIAGE") %>%
+  group_by(Year) %>%
+  dplyr::summarize(IPDCountNONPCV10 = n())
+
+### Merging the datasets
+# merging for the pcv10 cases
+mergedPcv10CarriageDf <- merge(pcv10NonGpsCarriage, pcv10GpsCarriage2, by = "Year", all = TRUE)
+# merging the non-PCV10 cases
+mergedNONpcv10CarriageDf <- merge(NonPCVForOffset, NONpcv10GpsCarriage2, by = "Year", all = TRUE)
+
+# adding the total counts for carriage to each
+mergedPcv10CarriageDf$CCount <- rowSums(mergedPcv10CarriageDf[, c("Count", "IPDCount")], na.rm = TRUE)
+mergedNONpcv10CarriageDf$CCountNONPCV10 <- rowSums(mergedNONpcv10CarriageDf[, c("Count", "IPDCountNONPCV10")], na.rm = TRUE)
+
+# final merging
+mergedwithOffset <- merge(mergedPcv10CarriageDf, mergedNONpcv10CarriageDf, by = "Year", all = TRUE)
+
+# selecting only the columns we need: year, PCV10 counts, non-PCV10 counts
+analysisDf <- mergedwithOffset %>%
+  dplyr::select(Year, CCount, CCountNONPCV10) %>%
+  filter(Year != 2014)
+```
+
+Now that our data has been cleaned, we move onto modeling. We used an interrupted time series model with connected segments (spline model) and a negative binomial fit, using non-PCV10 cases as an offset. While using other pneumococcal cases as an offset is not ideal, it was the best we could do based on the inconsistent data reporting over time. It helped account for this issue and gave us a model that fit our data better than any other offset that we tried.
+
+We first prepare the data to be fit:
+
+```{r preparing data for modeling}
+# creating an index variable
+time_series_df <- tibble::rownames_to_column(analysisDf, var = "index") %>%
+ mutate(index = as.numeric(index))
+
+# assigning the introduction date to be January 1st, 2015: not accurate, but since we only have aggregate year data, assigning the intro date to be anytime in 2015 works for our purposes
+vax.intro.date <- as.Date('2015-01-01')
+vax.intro.year <- format(vax.intro.date, "%Y")
+
+# assigning the evaluation date to be 2017 because there is no 2016 data
+vax.eval.date <- as.Date('2017-01-01')
+vax.eval.year <- format(vax.eval.date, "%Y")
+
+# identifying the index of the intro and eval year
+intro.index <- which(time_series_df$Year == year(vax.intro.date))
+eval.index <- which(time_series_df$Year == year(vax.eval.date))
+
+# converting indices to numeric
+intro.index <- as.numeric(intro.index)
+eval.index <- as.numeric(eval.index)
+
+# creating two splines, spl1 being time since vaccine intro (0 before intro), and spl2 being time since vaccine eval point (0 before eval)
+time_series_df <- time_series_df %>%
+  mutate(spl1 = ifelse(index - intro.index + 1 < 0, 0, index - intro.index + 1),
+         spl2 = ifelse(index - eval.index + 1 < 0, 0, index  - eval.index + 1))
+
+# viewing selected columns
+time_series_df[c("Year", "index", "spl1", "spl2")]
+
+# creating the log offset by selecting all non-PCV10 cases
+time_series_df$log.offset <- log(time_series_df$CCountNONPCV10)
+```
+
+We then fit the data using a negative binomial regression:
+
+```{r fitting a negative binomial regression model}
+# fit the model
+neg_bin_model <- glm.nb(CCount ~ index  + offset(log.offset) + spl1 + spl2, data = time_series_df)
+summary(neg_bin_model)
+```
+
+We then create our factual model (modeling what actually happened), and a counterfactual model (what would have happened if the vaccine had not been introduced), and compare the two by calculating a rate ratio:
+
+```{r factual and counterfactual models and rate ratio calculation}
+### Generating the Factual Model
+# making predictions with confidence intervals
+time_series_df.pred.spl <- time_series_df %>%
+  mutate(pred.spl = predict(neg_bin_model, type = "response"))
+
+### Generating the counterfactual model
+# initializing the vaccine effect variables by setting them to 0
+time_series_df.counterfactual.spl <- time_series_df
+time_series_df.counterfactual.spl$spl1 <- 0
+time_series_df.counterfactual.spl$spl2 <- 0
+# generating the fitted values
+time_series_df.pred.spl$pred.spl.cf <- predict(neg_bin_model, type = "response", 
+                                   newdata = time_series_df.counterfactual.spl)
+
+
+### Rate ratio to evaluate performance
+# calculating the rate ratio between the fitted and counterfactual values.
+time_series_df.pred.spl$rr.spline <- time_series_df.pred.spl$pred.spl/time_series_df.pred.spl$pred.spl.cf
+
+# Making predictions with confidence intervals
+pred2 <- predict(neg_bin_model, type = "response", se.fit = TRUE)
+
+# Adding the model predictions and 95% COI to the dataframe
+time_series_df.pred.spl <- time_series_df.pred.spl %>%
+  mutate(se.fit = pred2$se.fit, pred = pred2$fit) %>%
+  mutate(
+    conf.low = pred - 1.96 * se.fit,
+    conf.high = pred + 1.96 * se.fit
+  )
+
+time_series_df.pred.spl$Year <- as.numeric(time_series_df.pred.spl$Year)
+```
+
+Finally, we plot our results:
+
+```{r plotting}
+time_series_plot <- 
+  ggplot(time_series_df.pred.spl, aes(x = Year, y = CCount)) +
+      geom_point(aes(color = "Observed Cases")) +
+      # adding the fitted line
+      geom_line(data = time_series_df.pred.spl, aes(x = Year, y = pred.spl, group = 1, color = "Fitted Line"), size = .7) +
+      # adding the confidence interval
+      geom_ribbon(data = time_series_df.pred.spl, aes(ymin = conf.low, ymax = conf.high, fill = "95% CI"),
+                  alpha = 0.2, group = 1) +
+      # adding the counterfactual line
+      geom_line(data = time_series_df.pred.spl, aes(x = Year, y = pred.spl.cf, color = "Counterfactual"),
+                lty = 2, group = 1, size = .8)  +
+  labs(title = "Time Series Analysis - Pneumococcal Carriage Infections",
+      subtitle = paste0(
+    "<span style='font-size:12pt'>Negative Binomial Fit, Interrupted Time Series with Spline Smoothing</span><br>",
+    "<span style='font-size:1pt; color:white'>&nbsp;</span><br>",
+    "<span style='font-size:12pt; color:#6A0DAD'>Carriage Cases ~ Year Index + log(Offset) + Vaccine Intro Spline + Vaccine Eval Spline</span>"
+  ), x = "Year", y = "Cases"
+  ) +
+      theme_linedraw() +
+  # Adding a vertical line in 2015 to represent vaccine introduction
+  geom_vline(xintercept = 2015, color = "red", linetype = "dashed", size = .8) +
+  # Creating a legend
+    scale_color_manual(name='Legend',
+                     breaks=c('Fitted Line', 'Counterfactual', "Observed Cases"),
+                     values=c("Fitted Line" = "#00356B","Counterfactual" = "#E69F00", "Observed Cases" = "black")) +
+  scale_fill_manual(name='Legend',
+                     breaks=c('95% CI'),
+                     values=c("95% CI" = "#008080")) + 
+      # formatting
+      theme(panel.spacing = unit(2, 'lines'), 
+            axis.text.x = element_text(angle = 0, size = 12, vjust = 3, margin = margin(t = 10)),
+            axis.text.y = element_text(size = 12),
+            axis.title = element_text(size = 12),
+            axis.title.x = element_text(size = 14),
+            axis.title.y =element_text(size = 14),
+            plot.title = element_text(size = 15, face = "bold", hjust = 0.5),
+            legend.position = "bottom",
+            plot.subtitle = element_markdown(size = 12, hjust = 0.5),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 12)) +
+    scale_x_continuous(
+    breaks = seq(
+      floor(min(time_series_df.pred.spl$Year, na.rm = TRUE)),
+      ceiling(max(time_series_df.pred.spl$Year, na.rm = TRUE)),
+      by = 1
+    )) +
+  # adding annotation on the chart to label the vaccine introduction line
+  annotate("text", x = 2015.15, y = 00.1, label = "Vaccine Introduced", color = "red", hjust = 0)
+
+time_series_plot
+ggsave(filename="Time_Series.jpeg", plot=time_series_plot, width=8, height=5)
+```
+
+We next plot the rate ratio over time to analyze the model's sensitivity:
+
+```{r plotting rate ratio over time}
+p_ratio <- ggplot() +
+     geom_line(data = time_series_df.pred.spl, aes(x = Year, y = rr.spline), group = 1,
+               color = "#999999") +
+      labs(title = "Rate Ratio with the Spline Model")
+p_ratio
+```
+
+```{r}
+# Creating a Boolean variable that defines the vaccine evaluation period
+eval.period <- time_series_df$Year > 2015
+
+# Calculating the average outcome during the vaccine evaluation period
+rr.spline.eval <- mean(time_series_df.pred.spl$rr.spline[eval.period])
+
+# Showing the average decline detected from 1
+round(c("ITS - Spline" = rr.spline.eval), digits = 2)
+```
+
+
+
+```{r}
+# Showing the percent decline detected
+100*(1 - round(c("ITS - Spline" = rr.spline.eval), digits = 2))
+```
+
+The spline method identified a decrease of approximately 63% in pneumococcal carriage cases caused by PCV10 serotypes after the PCV10 intervention.
+
+Equation: carriage cases ~ year index + log(offset) + vaccine intro spline + vaccine evaluation spline

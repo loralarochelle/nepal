@@ -164,7 +164,7 @@ jcode <- "model {
 "
 ```
 
-```{r}
+```{r running JAGS model}
 # prepare data list for JAGS
 jdat <- list(
   N = length(unique(carriage_serotype_groups_df$Year)), # number of years
@@ -186,7 +186,7 @@ samp <- coda.samples(mod, variable.names = c("alpha", "beta"), n.iter = 5000)
 
 Next, we begin to analyze the results, starting with the posterior summaries for each slope and intercept:
 
-```{r}
+```{r get posterior summaries & alpha and beta means}
 # get posterior summaries & round
 posterior_summary <- summary(samp)
 round(posterior_summary$statistics, 3)
@@ -235,8 +235,8 @@ pred_grid <- left_join(pred_grid, year_map, by = c("year" = "year_id"))
 
 Last, we get data ready for plotting the expected proportion trends vs. the observed proportions:
 
-```{r}
-# add back the serotype labels for plitting
+```{r final getting data ready for plotting}
+# add back the serotype labels for plotting
 serotype_labels <- names(sero_id_map)
 
 carriage_serotype_groups_df <- carriage_serotype_groups_df %>%
